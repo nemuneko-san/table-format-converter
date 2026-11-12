@@ -442,3 +442,36 @@ describe("B6 CSP", () => {
     expect(csp).toContain("img-src 'self' data:");
   });
 });
+
+describe("C3 コードフェンスの外の文章", () => {
+  it("フェンスの内側だけを表にし、外側の文章は行にしない", () => {
+    const r = ok("結果\n```csv\na,b\n1,2\n```\n終わり");
+    expect(r.format).toBe("csv");
+    expect(r.table.rows).toEqual([
+      ["a", "b"],
+      ["1", "2"],
+    ]);
+    expect(r.warnings.join()).toContain("2 行");
+  });
+
+  it("フェンスが複数あれば候補選択の優先度（罫線表・Markdown が CSV より先）で選ぶ", () => {
+    const text = "```\nx,y\n1,2\n```\n説明\n```\n| a | b |\n| --- | --- |\n| 1 | 2 |\n```";
+    const r = ok(text);
+    expect(r.format).toBe("markdown");
+    expect(r.table.rows).toEqual([
+      ["a", "b"],
+      ["1", "2"],
+    ]);
+  });
+
+  it("フェンスなし・空行なしの説明文つき CSV は従来どおり表の行にする", () => {
+    expect(ok("結果\na,b\n1,2").table.rows).toHaveLength(3);
+  });
+
+  it("閉じていないフェンスは入力の終わりまでを内側とみなす", () => {
+    expect(ok("前置き\n```\na\tb\n1\t2").table.rows).toEqual([
+      ["a", "b"],
+      ["1", "2"],
+    ]);
+  });
+});

@@ -302,3 +302,33 @@ describe("B5〜B7・B13 の UI 修正", () => {
     expect(byId<HTMLTextAreaElement>("output").value).not.toBe("");
   });
 });
+
+describe("C4 設定と下書きの読み込みを独立に扱う", () => {
+  beforeEach(() => {
+    loadPageBody(appHtml);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  });
+
+  it("local.get だけが失敗しても sync の設定は使い、出力形式の変更は保存する", async () => {
+    const { chrome, sync } = installChromeMock({ sync: { settings: { outputFormat: "tsv", csvDelimiter: ";" } } });
+    chrome.storage.local.get.mockRejectedValueOnce(new Error("local broken"));
+    await appMain();
+    expect(byId<HTMLSelectElement>("output-format").value).toBe("tsv");
+    expect(byId("status").textContent).toContain("前回の入力を読み込めませんでした");
+    expect(byId("status").textContent).not.toContain("設定を読み込めませんでした");
+    select(byId("output-format"), "csv");
+    await Promise.resolve();
+    expect(sync.settings).toMatchObject({ outputFormat: "csv", csvDelimiter: ";" });
+  });
+
+  it("sync.get だけが失敗しても下書きは復元し、設定は書き戻さない（B7 維持）", async () => {
+    const { chrome } = installChromeMock({ local: { draft: "a,b\n1,2" } });
+    chrome.storage.sync.get.mockRejectedValueOnce(new Error("sync broken"));
+    await appMain();
+    expect(byId<HTMLTextAreaElement>("input").value).toBe("a,b\n1,2");
+    expect(byId("status").textContent).toContain("設定を読み込めませんでした");
+    select(byId("output-format"), "csv");
+    await Promise.resolve();
+    expect(chrome.storage.sync.set).not.toHaveBeenCalled();
+  });
+});

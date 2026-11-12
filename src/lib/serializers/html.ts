@@ -134,7 +134,12 @@ export function toHtml(table: Table, options: HtmlOptions): string {
   const lines = [`<table${tableAttr}>`];
   if (table.header && table.rows.length > 0) lines.push("  <thead>", row(table.rows[0], "th"), "  </thead>");
   const body = table.header ? table.rows.slice(1) : table.rows;
-  if (body.length > 0) lines.push("  <tbody>", ...body.map((cells) => row(cells, "td")), "  </tbody>");
+  if (body.length > 0) {
+    lines.push("  <tbody>");
+    // 行数に比例する個数を push(...x) で渡すと引数数の上限で RangeError になるため 1 行ずつ足す
+    for (const cells of body) lines.push(row(cells, "td"));
+    lines.push("  </tbody>");
+  }
   lines.push("</table>");
   return lines.join("\n");
 }

@@ -141,13 +141,21 @@ export async function main(): Promise<void> {
     setStatus(`変換中にエラーが発生しました: ${detail}`, "error");
   };
 
+  // 出力の生成で起きたエラーを表示中か。次に出力できたらパース結果の表示（警告など）に戻す
+  let outputErrorShown = false;
+
   const renderOutput = (): void => {
     try {
       el.output.value = table ? serialize(table, current.outputFormat, current) : "";
     } catch (error) {
       el.output.value = "";
+      outputErrorShown = true;
       showError(error);
+      return;
     }
+    if (!outputErrorShown) return;
+    outputErrorShown = false;
+    renderParseStatus();
   };
 
   const renderHeader = (): void => {
@@ -210,6 +218,7 @@ export async function main(): Promise<void> {
   /** 入力から表モデルを作り直す（プレビュー上の編集は破棄される）。入力の解釈が変わるときだけ呼ぶ */
   const reparse = (): void => {
     clearTimeout(parseTimer);
+    outputErrorShown = false;
     try {
       outcome = parseInput(el.input.value, inputFormat, current.preprocess);
       table = outcome.ok ? { ...outcome.table, header: headerOverride ?? outcome.detectedHeader } : null;
@@ -332,19 +341,19 @@ export async function main(): Promise<void> {
   });
 
   renderAll();
-  let loadFailed = false;
-  try {
-    const [settings, draft] = await Promise.all([loadSettings(), loadDraft()]);
-    stored = settings;
-    current = normalizeSettings(settings);
+  // 設定（sync）と下書き（local）は独立に読み込み、片方の失敗がもう片方を巻き込まないようにする
+  const [settingsResult, draftResult] = await Promise.allSettled([loadSettings(), loadDraft()]);
+  if (settingsResult.status === "fulfilled") {
+    stored = settingsResult.value;
+    current = normalizeSettings(settingsResult.value);
     settingsLoaded = true;
-    el.input.value = draft;
-  } catch {
-    loadFailed = true;
   }
+  if (draftResult.status === "fulfilled") el.input.value = draftResult.value;
   reparse();
-  if (loadFailed) {
-    setStatus("保存済みの設定・入力を読み込めませんでした。既定値で表示します（設定は保存されません）。", "warn");
-  }
+  const loadWarnings = [
+    settingsResult.status === "rejected" ? "保存済みの設定を読み込めませんでした。既定値で表示します（設定は保存されません）。" : "",
+    draftResult.status === "rejected" ? "前回の入力を読み込めませんでした。" : "",
+  ].filter((message) => message !== "");
+  if (loadWarnings.length > 0) setStatus(loadWarnings.join(" "), "warn");
   el.input.focus();
 }

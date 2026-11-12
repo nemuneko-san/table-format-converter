@@ -30,8 +30,35 @@ export function stripAnsi(text: string): string {
 export function stripCodeFence(text: string): string {
   return text
     .split("\n")
-    .filter((line) => !/^\s*(```|~~~)/.test(line))
+    .filter((line) => !FENCE_LINE.test(line))
     .join("\n");
+}
+
+const FENCE_LINE = /^\s*(```|~~~)/;
+
+/**
+ * コードフェンスの内側の行をブロックごとに返す。フェンスが無ければ null。
+ * 閉じていないフェンスは入力の終わりまでを内側とみなす。
+ */
+export function fencedBlocks(text: string): string[] | null {
+  const lines = text.split("\n");
+  if (!lines.some((line) => FENCE_LINE.test(line))) return null;
+  const blocks: string[] = [];
+  let inside: string[] | null = null;
+  for (const line of lines) {
+    if (!FENCE_LINE.test(line)) {
+      inside?.push(line);
+      continue;
+    }
+    if (inside) {
+      blocks.push(inside.join("\n"));
+      inside = null;
+      continue;
+    }
+    inside = [];
+  }
+  if (inside) blocks.push(inside.join("\n"));
+  return blocks;
 }
 
 function leadingSpaces(line: string): number {
@@ -190,16 +217,24 @@ export function extractTable(text: string): Preprocessed {
 /**
  * 変換前の前処理（Q9）。BOM 除去と改行の統一は常に行い、
  * その後 ANSI → コードフェンス → 表部分の抽出 → 共通インデントの順に、有効なものを適用する。
+ * コードフェンスがある入力で表部分の抽出も有効なときは、フェンスの内側だけを表の候補にする
+ * （フェンスの外の説明文は表の行にしない。複数のフェンスは抽出の優先度で 1 つ選ぶ）。
  */
 export function preprocess(text: string, options: PreprocessOptions): Preprocessed {
-  let out = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  let out = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
   let removedLines = 0;
   if (options.ansi) out = stripAnsi(out);
-  if (options.fence) out = stripCodeFence(out);
+  if (options.fence) {
+    const stripped = stripCodeFence(out);
+    const blocks = options.extract ? fencedBlocks(out) : null;
+    // フェンスの内側どうしは空行で区切り、抽出で別のブロックとして扱う
+    out = blocks ? blocks.join("\n\n") : stripped;
+    removedLines = countNonBlank(stripped) - countNonBlank(out);
+  }
   if (options.extract) {
     const extracted = extractTable(out);
     out = extracted.text;
-    removedLines = extracted.removedLines;
+    removedLines += extracted.removedLines;
   }
   if (options.indent) out = removeCommonIndent(out);
   return { text: out, removedLines };
