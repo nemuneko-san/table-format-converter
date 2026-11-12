@@ -475,3 +475,70 @@ describe("C3 コードフェンスの外の文章", () => {
     ]);
   });
 });
+
+describe("D1 フェンスの内側に表が無いときは外側から抽出する", () => {
+  it("コードブロックの後の Markdown 表", () => {
+    const r = ok("```\nls -la\n```\n\n| a | b |\n|---|---|\n| 1 | 2 |");
+    expect(r.format).toBe("markdown");
+    expect(r.table.rows).toEqual([
+      ["a", "b"],
+      ["1", "2"],
+    ]);
+  });
+
+  it("説明・コードブロックの後の CSV", () => {
+    const r = ok("手順\n```sh\nnpm run build\n```\n\nname,score\nA,1\nB,2");
+    expect(r.format).toBe("csv");
+    expect(r.table.rows).toEqual([
+      ["name", "score"],
+      ["A", "1"],
+      ["B", "2"],
+    ]);
+  });
+
+  it("フェンス内のカンマを含むコード 1 行を表とみなさない", () => {
+    const r = ok("```js\nconsole.log(a, b)\n```\n\n| x | y |\n| --- | --- |\n| 1 | 2 |");
+    expect(r.format).toBe("markdown");
+    expect(r.table.rows).toEqual([
+      ["x", "y"],
+      ["1", "2"],
+    ]);
+  });
+
+  it("フェンスの内側に表があれば、外側の文章は除外する（C3 を維持）", () => {
+    const r = ok("結果\n```csv\na,b\n1,2\n```\n終わり");
+    expect(r.table.rows).toEqual([
+      ["a", "b"],
+      ["1", "2"],
+    ]);
+  });
+
+  it("フェンスで囲んだ依頼文サンプルは往復で一致する", () => {
+    const r = ok(`以下の表です。\n\`\`\`\n${SAMPLE_BOX}\n\`\`\`\nよろしく`);
+    expect(r.format).toBe("box");
+    expect(serialize(r.table, "box", DEFAULT_SETTINGS)).toBe(SAMPLE_BOX);
+  });
+
+  it("フェンスの内側にも外側にも複数行の表が無ければ、内側の 1 行 CSV を使う", () => {
+    expect(ok("```\nx,y\n```").table.rows).toEqual([["x", "y"]]);
+  });
+});
+
+describe("D2 1 つのフェンスの内側は 1 つの表として扱う", () => {
+  it("フェンス内の空行でヘッダーを落とさない", () => {
+    const r = ok("説明\n```csv\na,b\n\n1,2\n3,4\n```\n以上");
+    expect(r.table.rows).toEqual([
+      ["a", "b"],
+      ["1", "2"],
+      ["3", "4"],
+    ]);
+  });
+
+  it("引用符内の空行はセル内改行として保つ", () => {
+    const r = ok('```csv\na,b\n"x\n\ny",2\n```');
+    expect(r.table.rows).toEqual([
+      ["a", "b"],
+      ["x\n\ny", "2"],
+    ]);
+  });
+});

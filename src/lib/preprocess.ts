@@ -1,5 +1,6 @@
 import { detectFormat, isAsciiLine, isBoxLine, looksLikeHtml, looksLikeJson } from "./detect";
 import type { Format } from "./model";
+import { PARSERS } from "./parsers/index";
 
 export type PreprocessOptions = {
   /** ANSI エスケープ（色コード）を除去する */
@@ -36,29 +37,34 @@ export function stripCodeFence(text: string): string {
 
 const FENCE_LINE = /^\s*(```|~~~)/;
 
+/** コードフェンスで分けた入力。inside はフェンスごとの内側の行、outside はフェンスの外の行 */
+export type Fences = { inside: string[][]; outside: string[] };
+
 /**
- * コードフェンスの内側の行をブロックごとに返す。フェンスが無ければ null。
- * 閉じていないフェンスは入力の終わりまでを内側とみなす。
+ * 入力をコードフェンスの内側と外側に分ける。フェンスが無ければ null。
+ * 閉じていないフェンスは入力の終わりまでを内側とみなす。フェンスのあった位置は外側では空行にして、前後の文章を別のブロックに分ける。
  */
-export function fencedBlocks(text: string): string[] | null {
+export function splitFences(text: string): Fences | null {
   const lines = text.split("\n");
   if (!lines.some((line) => FENCE_LINE.test(line))) return null;
-  const blocks: string[] = [];
-  let inside: string[] | null = null;
+  const inside: string[][] = [];
+  const outside: string[] = [];
+  let current: string[] | null = null;
   for (const line of lines) {
     if (!FENCE_LINE.test(line)) {
-      inside?.push(line);
+      (current ?? outside).push(line);
       continue;
     }
-    if (inside) {
-      blocks.push(inside.join("\n"));
-      inside = null;
+    if (current) {
+      inside.push(current);
+      current = null;
       continue;
     }
-    inside = [];
+    current = [];
+    outside.push("");
   }
-  if (inside) blocks.push(inside.join("\n"));
-  return blocks;
+  if (current) inside.push(current);
+  return { inside, outside };
 }
 
 function leadingSpaces(line: string): number {
@@ -193,48 +199,85 @@ function extractJson(text: string): string | null {
   return looksLikeJson(candidate) ? candidate : null;
 }
 
+type Found = { text: string; found: boolean };
+
 /**
- * 表の前後にある空行・説明文を除き、表部分だけを取り出す。
+ * 表の前後にある空行・説明文を除き、表部分だけを探す。見つからなければ found=false で先頭・末尾の空行だけを除いて返す。
  * 優先順: 入力全体が JSON / HTML → 罫線表・Markdown（構造で範囲が確定）→ HTML の table → JSON の配列 → CSV / TSV のブロック
  */
-export function extractTable(text: string): Preprocessed {
-  const finish = (result: string): Preprocessed => ({
-    text: result,
-    removedLines: Math.max(0, countNonBlank(text) - countNonBlank(result)),
-  });
-  if (looksLikeJson(text) || looksLikeHtml(text)) return finish(trimBlankLines(text));
+function findTable(text: string): Found {
+  if (looksLikeJson(text) || looksLikeHtml(text)) return { text: trimBlankLines(text), found: true };
   const candidates = splitBlocks(text).flatMap(blockCandidates);
   const structural = pickBest(candidates.filter((c) => STRUCTURAL.includes(c.format)));
-  if (structural) return finish(structural.lines.join("\n"));
+  if (structural) return { text: structural.lines.join("\n"), found: true };
   const html = extractHtmlTable(text);
-  if (html) return finish(html);
+  if (html) return { text: html, found: true };
   const json = extractJson(text);
-  if (json) return finish(json);
+  if (json) return { text: json, found: true };
   const delimited = pickBest(candidates);
-  return finish(delimited ? delimited.lines.join("\n") : trimBlankLines(text));
+  return delimited ? { text: delimited.lines.join("\n"), found: true } : { text: trimBlankLines(text), found: false };
+}
+
+export function extractTable(text: string): Preprocessed {
+  const result = findTable(text).text;
+  return { text: result, removedLines: Math.max(0, countNonBlank(text) - countNonBlank(result)) };
+}
+
+/**
+ * 1 つのフェンスの内側から表の候補を作る。内側の空行ではブロックを分けない（1 フェンス = 1 候補）。
+ * strict のときは、CSV / TSV を「2 列以上の行が 2 行以上」に限る（`console.log(a, b)` のようなコード 1 行を表とみなさない）。
+ */
+function fenceCandidates(lines: readonly string[], strict: boolean): Candidate[] {
+  const text = lines.join("\n");
+  const nonBlank = lines.filter((line) => !isBlank(line));
+  if (nonBlank.length === 0) return [];
+  if (looksLikeJson(text)) return [{ lines: [...lines], format: "json" }];
+  if (looksLikeHtml(text)) return [{ lines: [...lines], format: "html" }];
+  const structural = STRUCTURAL.flatMap((format) => {
+    const trimmed = trimNonTableLines(format, nonBlank);
+    if (trimmed.length === 0) return [];
+    return detectFormat(trimmed.join("\n")).format === format ? [{ lines: trimmed, format }] : [];
+  });
+  const whole = detectFormat(text).format;
+  if (!whole || !DELIMITED.includes(whole)) return structural;
+  const wideRows = PARSERS[whole](text).rows.filter((row) => row.length >= 2).length;
+  return strict && wideRows < 2 ? structural : [...structural, { lines: [...lines], format: whole }];
+}
+
+/**
+ * コードフェンスがある入力の表部分を選ぶ。
+ * 1. いずれかのフェンスの内側に表があれば、その内側だけを使う（外側の文章は表の行にしない）
+ * 2. 内側に表が無ければ、フェンス行とフェンスの中身を除いた外側から従来どおり抽出する
+ * 3. 外側にも無ければ、緩い判定で内側を使う
+ */
+function tableFromFences(fences: Fences): Found {
+  const strict = pickBest(fences.inside.flatMap((lines) => fenceCandidates(lines, true)));
+  if (strict) return { text: strict.lines.join("\n"), found: true };
+  const outside = findTable(fences.outside.join("\n"));
+  if (outside.found) return outside;
+  const loose = pickBest(fences.inside.flatMap((lines) => fenceCandidates(lines, false)));
+  return loose ? { text: loose.lines.join("\n"), found: true } : { text: "", found: false };
 }
 
 /**
  * 変換前の前処理（Q9）。BOM 除去と改行の統一は常に行い、
  * その後 ANSI → コードフェンス → 表部分の抽出 → 共通インデントの順に、有効なものを適用する。
- * コードフェンスがある入力で表部分の抽出も有効なときは、フェンスの内側だけを表の候補にする
- * （フェンスの外の説明文は表の行にしない。複数のフェンスは抽出の優先度で 1 つ選ぶ）。
+ * コードフェンスがあり表部分の抽出も有効なときは、tableFromFences で表を選ぶ。
  */
 export function preprocess(text: string, options: PreprocessOptions): Preprocessed {
   let out = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
   let removedLines = 0;
   if (options.ansi) out = stripAnsi(out);
-  if (options.fence) {
-    const stripped = stripCodeFence(out);
-    const blocks = options.extract ? fencedBlocks(out) : null;
-    // フェンスの内側どうしは空行で区切り、抽出で別のブロックとして扱う
-    out = blocks ? blocks.join("\n\n") : stripped;
-    removedLines = countNonBlank(stripped) - countNonBlank(out);
-  }
-  if (options.extract) {
+  const fences = options.fence && options.extract ? splitFences(out) : null;
+  if (options.fence) out = stripCodeFence(out);
+  const fenced = fences ? tableFromFences(fences) : null;
+  if (fenced?.found) {
+    removedLines = Math.max(0, countNonBlank(out) - countNonBlank(fenced.text));
+    out = fenced.text;
+  } else if (options.extract) {
     const extracted = extractTable(out);
     out = extracted.text;
-    removedLines += extracted.removedLines;
+    removedLines = extracted.removedLines;
   }
   if (options.indent) out = removeCommonIndent(out);
   return { text: out, removedLines };
