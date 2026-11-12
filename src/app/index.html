@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Table Format Converter</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Table Format Converter</h1>
+      <button type="button" id="open-options" class="link-button">設定（既定値）</button>
+    </header>
+
+    <main class="panes">
+      <section class="pane" aria-labelledby="input-title">
+        <div class="pane-head">
+          <h2 id="input-title">入力</h2>
+          <label>
+            形式
+            <select id="input-format"></select>
+          </label>
+          <span id="detected" class="muted"></span>
+          <span class="spacer"></span>
+          <button type="button" id="paste-button">クリップボードから貼り付け</button>
+          <button type="button" id="clear-button">クリア</button>
+        </div>
+        <textarea
+          id="input"
+          class="mono"
+          spellcheck="false"
+          placeholder="Markdown / TSV / CSV / 罫線表 / HTML / JSON の表を貼り付けてください（Ctrl+V）"
+        ></textarea>
+        <div id="candidates" class="candidates" hidden>
+          <p>形式を判定できませんでした。入力の形式を選んでください:</p>
+          <div id="candidate-buttons" class="button-row"></div>
+        </div>
+      </section>
+
+      <section class="pane" aria-labelledby="output-title">
+        <div class="pane-head">
+          <h2 id="output-title">出力</h2>
+          <label>
+            形式
+            <select id="output-format"></select>
+          </label>
+          <span class="spacer"></span>
+          <button type="button" id="copy-button" class="primary">コピー</button>
+          <button type="button" id="rich-copy-button" class="primary" hidden>リッチコピー</button>
+          <button type="button" id="source-copy-button" hidden>ソースコピー</button>
+        </div>
+        <div class="format-options">
+          <label>
+            <input type="checkbox" id="header-toggle" />
+            1 行目をヘッダーにする
+          </label>
+          <span id="header-mode" class="muted"></span>
+          <label data-formats="markdown">
+            <input type="checkbox" id="opt-markdown-pad" />
+            桁を揃える
+          </label>
+          <label data-formats="box">
+            線種
+            <select id="opt-box-style"></select>
+          </label>
+          <label data-formats="box ascii">
+            <input type="checkbox" id="opt-row-separators" />
+            行の間に罫線
+          </label>
+          <label data-formats="markdown box">
+            曖昧幅の文字
+            <select id="opt-ambiguous">
+              <option value="1">幅 1</option>
+              <option value="2">幅 2</option>
+            </select>
+          </label>
+          <label data-formats="csv">
+            区切り文字
+            <select id="opt-csv-delimiter">
+              <option value=",">カンマ ,</option>
+              <option value=";">セミコロン ;</option>
+              <option value="|">パイプ |</option>
+            </select>
+          </label>
+          <label data-formats="html">
+            スタイル
+            <select id="opt-html-style"></select>
+          </label>
+          <label data-formats="json">
+            構造
+            <select id="opt-json-structure"></select>
+          </label>
+          <label data-formats="json">
+            <input type="checkbox" id="opt-json-numbers" />
+            数値を number にする
+          </label>
+        </div>
+        <textarea id="output" class="mono" spellcheck="false" readonly></textarea>
+      </section>
+    </main>
+
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+
+    <section class="preview-section" aria-labelledby="preview-title">
+      <div class="pane-head">
+        <h2 id="preview-title">プレビュー</h2>
+        <button type="button" id="transpose-button">行列を入れ替え</button>
+        <span class="muted">セルをクリックすると編集できます。列見出しのボタンで列の移動・削除ができます。</span>
+      </div>
+      <div id="preview" class="preview"></div>
+    </section>
+
+    <script type="module" src="./entry.ts"></script>
+  </body>
+</html>

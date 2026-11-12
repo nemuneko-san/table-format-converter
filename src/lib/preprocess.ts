@@ -95,28 +95,38 @@ function trimCsvLines(lines: readonly string[]): string[] {
   return lines.slice(start, end);
 }
 
-type Block = { lines: string[]; format: Format | null };
+type Block = { lines: string[]; format: Format };
+
+const LINE_FORMATS: readonly Format[] = ["box", "ascii", "markdown", "tsv", "csv"];
+
+/** ブロックの前後から説明文を切り落とし、その形式として判定できるものを候補にする */
+function blockCandidates(lines: readonly string[]): Block[] {
+  return LINE_FORMATS.flatMap((format) => {
+    const trimmed = format === "csv" ? trimCsvLines(lines) : trimNonTableLines(format, lines);
+    if (trimmed.length === 0) return [];
+    return detectFormat(trimmed.join("\n")).format === format ? [{ lines: trimmed, format }] : [];
+  });
+}
 
 function splitBlocks(text: string): Block[] {
   return text
-    .split(/\r?\n(?:[ \t　]*\r?\n)+/)
+    .split(/\r?\n(?:[ \t\u3000]*\r?\n)+/)
     .map((chunk) => chunk.split(/\r?\n/).filter((line) => line.trim() !== ""))
     .filter((lines) => lines.length > 0)
-    .map((lines) => ({ lines, format: detectFormat(lines.join("\n")).format }));
+    .flatMap(blockCandidates);
 }
 
 function pickBlock(blocks: readonly Block[]): Block | null {
   let best: Block | null = null;
   for (const block of blocks) {
-    if (!block.format) continue;
     if (!best || isBetter(block, best)) best = block;
   }
   return best;
 }
 
 function isBetter(a: Block, b: Block): boolean {
-  const pa = a.format ? PRIORITY[a.format] : 0;
-  const pb = b.format ? PRIORITY[b.format] : 0;
+  const pa = PRIORITY[a.format];
+  const pb = PRIORITY[b.format];
   return pa !== pb ? pa > pb : a.lines.length > b.lines.length;
 }
 
@@ -140,9 +150,7 @@ export function extractTable(text: string): string {
     if (score === 1) return trimBlankLines(text);
   }
   const block = pickBlock(splitBlocks(text));
-  if (!block?.format) return trimBlankLines(text);
-  const lines = block.format === "csv" ? trimCsvLines(block.lines) : trimNonTableLines(block.format, block.lines);
-  return lines.join("\n");
+  return block ? block.lines.join("\n") : trimBlankLines(text);
 }
 
 /** 変換前の前処理（Q9）。ANSI → コードフェンス → 表部分の抽出 → 共通インデントの順に適用する */

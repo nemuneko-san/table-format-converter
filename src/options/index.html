@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Table Format Converter の設定</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <h1>Table Format Converter の設定</h1>
+    <p class="muted">ここで変えた値が変換タブの既定値になります。変更は自動で保存されます。</p>
+
+    <form id="settings-form">
+      <fieldset>
+        <legend>出力</legend>
+        <label>出力形式 <select id="outputFormat"></select></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>文字幅</legend>
+        <label>
+          曖昧幅の文字（— × ○ ※ → 罫線文字 など）
+          <select id="ambiguousWide">
+            <option value="false">幅 1</option>
+            <option value="true">幅 2</option>
+          </select>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Markdown</legend>
+        <label><input type="checkbox" id="markdownPad" /> 桁を揃えて整形する</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>罫線文字の表 / ASCII 罫線の表</legend>
+        <label>線種（罫線文字の表） <select id="boxStyle"></select></label>
+        <label><input type="checkbox" id="rowSeparators" /> 全ての行の間に罫線を入れる（オフならヘッダーの下だけ）</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>CSV</legend>
+        <label>
+          区切り文字
+          <select id="csvDelimiter">
+            <option value=",">カンマ ,</option>
+            <option value=";">セミコロン ;</option>
+            <option value="|">パイプ |</option>
+          </select>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>HTML</legend>
+        <label>スタイル <select id="htmlStyle"></select></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>JSON</legend>
+        <label>構造 <select id="jsonStructure"></select></label>
+        <label><input type="checkbox" id="jsonNumbers" /> 整数・小数のセルを number にする</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>貼り付け時の前処理</legend>
+        <label><input type="checkbox" id="pre-ansi" /> ANSI エスケープ（色コード）を除去する</label>
+        <label><input type="checkbox" id="pre-indent" /> 全行共通の先頭インデントを除去する</label>
+        <label><input type="checkbox" id="pre-fence" /> Markdown のコードフェンス（```）を除去する</label>
+        <label><input type="checkbox" id="pre-extract" /> 表の前後にある空行・説明文を除き、表部分だけを取り出す</label>
+      </fieldset>
+    </form>
+
+    <p id="persist-message" class="muted" role="status"></p>
+    <button type="button" id="reset-button">既定値に戻す</button>
+
+    <script type="module" src="./entry.ts"></script>
+  </body>
+</html>

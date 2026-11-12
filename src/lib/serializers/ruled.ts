@@ -46,12 +46,15 @@ function renderRuled(table: Table, charset: Charset, options: RuledOptions): str
   const inner = columnWidths(rows, options).map((w) => Math.ceil((w + 2) / unit) * unit);
   const border = ([left, middle, right]: readonly [string, string, string]): string =>
     left + inner.map((w) => charset.h.repeat(w / unit)).join(middle) + right;
-  const content = (row: readonly string[]): string =>
-    charset.v + row.map((cell, c) => ` ${padCell(cell, inner[c] - 2, aligns[c], options)} `).join(charset.v) + charset.v;
+  // ヘッダー行は左詰め、データ行は列の揃えに従って詰める
+  const content = (row: readonly string[], isHeader: boolean): string =>
+    charset.v +
+    row.map((cell, c) => ` ${padCell(cell, inner[c] - 2, isHeader ? "none" : aligns[c], options)} `).join(charset.v) +
+    charset.v;
   const lines = [border(charset.top)];
   rows.forEach((row, index) => {
     if (index > 0 && (options.rowSeparators || (table.header && index === 1))) lines.push(border(charset.mid));
-    lines.push(content(row));
+    lines.push(content(row, table.header && index === 0));
   });
   lines.push(border(charset.bottom));
   return lines.join("\n");

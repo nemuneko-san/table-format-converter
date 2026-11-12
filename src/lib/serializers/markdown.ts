@@ -47,8 +47,9 @@ export function toMarkdown(table: Table, options: MarkdownOptions): string {
   }
   const minWidths = aligns.map((a) => (a === "center" ? 5 : a === "none" ? 3 : 4));
   const widths = columnWidths([header, ...body], options).map((w, c) => Math.max(minWidths[c], w));
-  const line = (row: readonly string[]): string =>
-    paddedLine(row.map((cell, c) => padCell(cell, widths[c], aligns[c], options)));
+  // ヘッダー行は左詰め、データ行は列の揃えに従って詰める（Q25 の例と同じ）
+  const line = (row: readonly string[], isHeader = false): string =>
+    paddedLine(row.map((cell, c) => padCell(cell, widths[c], isHeader ? "none" : aligns[c], options)));
   const sep = paddedLine(aligns.map((a, c) => separatorCell(a, widths[c])));
-  return [line(header), sep, ...body.map(line)].join("\n");
+  return [line(header, true), sep, ...body.map((row) => line(row))].join("\n");
 }

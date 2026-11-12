@@ -1,0 +1,33 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, "Segoe UI", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
+  font-size: 14px;
+}
+
+body {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 24px 32px;
+}
+
+h1 {
+  font-size: 18px;
+}
+
+fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+  border: 1px solid #c8ccd2;
+  border-radius: 6px;
+}
+
+legend {
+  font-weight: 600;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 12px;
+}
