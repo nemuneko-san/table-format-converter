@@ -1,7 +1,7 @@
 import { effectiveAligns } from "../align";
 import type { Table } from "../model";
 import { stringWidth, type WidthOptions } from "../width";
-import { columnWidths, flattenNewlines, padCell } from "./layout";
+import { flattenNewlines, measure, padCell } from "./layout";
 
 /** 罫線の文字セット。[左, 中, 右] × [上, 中, 下] と横線・縦線 */
 type Charset = {
@@ -43,18 +43,22 @@ function renderRuled(table: Table, charset: Charset, options: RuledOptions): str
   const aligns = effectiveAligns(table);
   // 罫線文字の幅（曖昧幅 2 のとき 2）。列の内幅をその倍数に切り上げて縦線の位置を揃える
   const unit = Math.max(1, stringWidth(charset.h, options));
-  const inner = columnWidths(rows, options).map((w) => Math.ceil((w + 2) / unit) * unit);
+  const measured = measure(rows, options);
+  const inner = measured.columnWidths.map((w) => Math.ceil((w + 2) / unit) * unit);
   const border = ([left, middle, right]: readonly [string, string, string]): string =>
     left + inner.map((w) => charset.h.repeat(w / unit)).join(middle) + right;
   // ヘッダー行は左詰め、データ行は列の揃えに従って詰める
-  const content = (row: readonly string[], isHeader: boolean): string =>
-    charset.v +
-    row.map((cell, c) => ` ${padCell(cell, inner[c] - 2, isHeader ? "none" : aligns[c], options)} `).join(charset.v) +
-    charset.v;
+  const content = (row: readonly string[], r: number): string => {
+    const isHeader = table.header && r === 0;
+    const cells = row.map(
+      (cell, c) => ` ${padCell(cell, measured.cellWidths[r][c], inner[c] - 2, isHeader ? "none" : aligns[c])} `,
+    );
+    return charset.v + cells.join(charset.v) + charset.v;
+  };
   const lines = [border(charset.top)];
   rows.forEach((row, index) => {
     if (index > 0 && (options.rowSeparators || (table.header && index === 1))) lines.push(border(charset.mid));
-    lines.push(content(row, table.header && index === 0));
+    lines.push(content(row, index));
   });
   lines.push(border(charset.bottom));
   return lines.join("\n");

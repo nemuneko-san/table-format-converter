@@ -28,7 +28,7 @@ function columnControls(cols: number, handlers: PreviewHandlers): HTMLTableRowEl
     th.append(
       button("←", `${c + 1} 列目を左へ移動`, () => handlers.onMoveColumn(c, -1), c === 0),
       button("→", `${c + 1} 列目を右へ移動`, () => handlers.onMoveColumn(c, 1), c === cols - 1),
-      button("✕", `${c + 1} 列目を削除`, () => handlers.onDeleteColumn(c)),
+      button("✕", `${c + 1} 列目を削除`, () => handlers.onDeleteColumn(c), cols <= 1),
     );
     tr.append(th);
   }
@@ -38,7 +38,8 @@ function columnControls(cols: number, handlers: PreviewHandlers): HTMLTableRowEl
 function editableCell(tag: "th" | "td", value: string, r: number, c: number, handlers: PreviewHandlers): HTMLElement {
   const cell = document.createElement(tag);
   cell.textContent = value;
-  cell.contentEditable = "true";
+  // 貼り付けた書式・画像などを持ち込まないよう、プレーンテキストだけを編集できるようにする
+  cell.setAttribute("contenteditable", "plaintext-only");
   cell.spellcheck = false;
   cell.dataset.row = String(r);
   cell.dataset.col = String(c);

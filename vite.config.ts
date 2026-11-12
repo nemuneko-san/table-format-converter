@@ -7,6 +7,9 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    // modulepreload の polyfill は fetch で自分のモジュールを読む。Chrome は modulepreload に対応しており不要で、
+    // CSP の connect-src 'none' とも衝突するため出力しない
+    modulePreload: { polyfill: false },
     rollupOptions: {
       input: { app: "src/app/index.html" },
     },

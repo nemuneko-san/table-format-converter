@@ -1,5 +1,5 @@
 import { detectFormat } from "./detect";
-import type { Format, Table } from "./model";
+import { columnCount, type Format, type Table } from "./model";
 import { normalize } from "./normalize";
 import { PARSERS } from "./parsers/index";
 import { preprocess, type PreprocessOptions } from "./preprocess";
@@ -29,7 +29,7 @@ export type ParseOutcome = ParseSuccess | ParseFailure;
 
 /** 入力テキストを前処理 → 形式判定 → 解析 → 正規化して表モデルにする */
 export function parseInput(text: string, inputFormat: InputFormat, pre: PreprocessOptions): ParseOutcome {
-  const source = preprocess(text, pre);
+  const { text: source, removedLines } = preprocess(text, pre);
   if (source.trim() === "") return { ok: false, reason: "empty", message: "", candidates: [] };
   const detection = inputFormat === "auto" ? detectFormat(source) : { format: inputFormat, candidates: [] };
   if (!detection.format) {
@@ -43,9 +43,11 @@ export function parseInput(text: string, inputFormat: InputFormat, pre: Preproce
   const format = detection.format;
   try {
     const raw = PARSERS[format](source);
-    if (raw.rows.length === 0) throw new Error("表の行が見つかりません");
+    if (columnCount(raw.rows) === 0) throw new Error("表のセルが見つかりません");
     const normalized = normalize(raw, format === "markdown");
-    return { ok: true, format, auto: inputFormat === "auto", ...normalized };
+    const notice =
+      removedLines > 0 ? [`表の前後にある ${removedLines} 行を表の外（説明文など）とみなして除外しました`] : [];
+    return { ok: true, format, auto: inputFormat === "auto", ...normalized, warnings: [...notice, ...normalized.warnings] };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     return { ok: false, reason: "error", message: `入力を解析できませんでした: ${detail}`, candidates: [] };

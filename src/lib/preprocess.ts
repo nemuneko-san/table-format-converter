@@ -1,12 +1,5 @@
-import {
-  detectFormat,
-  detectStrong,
-  isAsciiLine,
-  isBoxLine,
-  looksLikeHtml,
-} from "./detect";
+import { detectFormat, isAsciiLine, isBoxLine, looksLikeHtml, looksLikeJson } from "./detect";
 import type { Format } from "./model";
-import { CSV_DELIMITERS, delimiterScore, parseDelimitedRows } from "./parsers/delimited";
 
 export type PreprocessOptions = {
   /** ANSI エスケープ（色コード）を除去する */
@@ -21,6 +14,12 @@ export type PreprocessOptions = {
 
 export const DEFAULT_PREPROCESS: PreprocessOptions = { ansi: true, indent: true, fence: true, extract: true };
 
+export type Preprocessed = {
+  text: string;
+  /** 表部分の抽出で除外した（空行以外の）行数。0 なら除外なし */
+  removedLines: number;
+};
+
 // ESC [ ... 終端文字（CSI）と ESC ] ... BEL/ST（OSC）、および単独の 2 文字シーケンス
 const ANSI_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)|\u001b[@-Z\\-_]/g;
 
@@ -30,44 +29,72 @@ export function stripAnsi(text: string): string {
 
 export function stripCodeFence(text: string): string {
   return text
-    .split(/\r?\n/)
+    .split("\n")
     .filter((line) => !/^\s*(```|~~~)/.test(line))
     .join("\n");
 }
 
+function leadingSpaces(line: string): number {
+  return (line.match(/^ */) ?? [""])[0].length;
+}
+
 /** 空行を除く全行に共通する先頭の半角空白を除去する（タブは TSV の空セルでありうるため対象外） */
 export function removeCommonIndent(text: string): string {
-  const lines = text.split(/\r?\n/);
-  const indents = lines.filter((line) => line.trim() !== "").map((line) => (line.match(/^ */) ?? [""])[0].length);
-  const common = indents.length === 0 ? 0 : Math.min(...indents);
-  if (common === 0) return text;
-  return lines.map((line) => line.slice(Math.min(common, (line.match(/^ */) ?? [""])[0].length))).join("\n");
+  const lines = text.split("\n");
+  const common = lines
+    .filter((line) => line.trim() !== "")
+    .reduce<number | null>((min, line) => {
+      const n = leadingSpaces(line);
+      return min === null || n < min ? n : min;
+    }, null);
+  if (!common) return text;
+  return lines.map((line) => line.slice(Math.min(common, leadingSpaces(line)))).join("\n");
 }
 
-function extractHtmlTable(text: string): string {
-  const start = text.search(/<table[\s>]/i);
-  const end = text.toLowerCase().lastIndexOf("</table>");
-  if (start === -1 || end === -1 || end < start) return text;
-  return text.slice(start, end + "</table>".length);
+function isBlank(line: string): boolean {
+  return line.trim() === "";
 }
 
-function extractJson(text: string): string | null {
-  const start = text.indexOf("[");
-  const end = text.lastIndexOf("]");
-  if (start === -1 || end <= start) return null;
-  const candidate = text.slice(start, end + 1);
-  return detectStrong(candidate) === "json" ? candidate : null;
+function countNonBlank(text: string): number {
+  return text.split("\n").filter((line) => !isBlank(line)).length;
 }
 
+/** 先頭・末尾の空行だけを除く（行頭のタブは TSV の空セルなので残す） */
+function trimBlankLines(text: string): string {
+  const lines = text.split("\n");
+  let start = 0;
+  let end = lines.length;
+  while (start < end && isBlank(lines[start])) start++;
+  while (end > start && isBlank(lines[end - 1])) end--;
+  return lines.slice(start, end).join("\n");
+}
+
+/**
+ * 空行でブロックに分ける。ただし引用符（"）の内側の空行では分けない（CSV / TSV のセル内改行を壊さない）。
+ */
+export function splitBlocks(text: string): string[][] {
+  const blocks: string[][] = [[]];
+  let inQuote = false;
+  for (const line of text.split("\n")) {
+    if (isBlank(line) && !inQuote) {
+      if (blocks[blocks.length - 1].length > 0) blocks.push([]);
+      continue;
+    }
+    blocks[blocks.length - 1].push(line);
+    if ((line.match(/"/g) ?? []).length % 2 === 1) inQuote = !inQuote;
+  }
+  return blocks.filter((block) => block.length > 0);
+}
+
+/** 構造（罫線・区切り行）で表の範囲が確定する形式。前後の説明文は空行が無くても切り落とせる */
+const STRUCTURAL: readonly Format[] = ["box", "ascii", "markdown"];
+const DELIMITED: readonly Format[] = ["tsv", "csv"];
 const PRIORITY: Record<Format, number> = { json: 5, html: 5, box: 4, ascii: 4, markdown: 3, tsv: 2, csv: 1 };
 
-/** 行が形式の表の一部らしいか（表の前後の説明文を切り落とすのに使う） */
 function lineFits(format: Format, line: string): boolean {
   if (format === "box") return isBoxLine(line);
   if (format === "ascii") return isAsciiLine(line);
-  if (format === "markdown") return line.includes("|");
-  if (format === "tsv") return line.includes("\t");
-  return true;
+  return line.includes("|");
 }
 
 function trimNonTableLines(format: Format, lines: readonly string[]): string[] {
@@ -78,87 +105,102 @@ function trimNonTableLines(format: Format, lines: readonly string[]): string[] {
   return lines.slice(start, end);
 }
 
-/** CSV ブロックの前後で、最頻のフィールド数と異なる行（説明文）を切り落とす */
-function trimCsvLines(lines: readonly string[]): string[] {
-  const text = lines.join("\n");
-  const delimiter =
-    CSV_DELIMITERS.find((d) => delimiterScore(parseDelimitedRows(text, d)) >= 0.5) ?? CSV_DELIMITERS[0];
-  const counts = lines.map((line) => parseDelimitedRows(line, delimiter)[0]?.length ?? 0);
-  const mode = counts.reduce<number>(
-    (best, n) => (counts.filter((c) => c === n).length > counts.filter((c) => c === best).length ? n : best),
-    counts[0] ?? 0,
-  );
-  let start = 0;
-  let end = lines.length;
-  while (start < end && counts[start] !== mode) start++;
-  while (end > start && counts[end - 1] !== mode) end--;
-  return lines.slice(start, end);
-}
+type Candidate = { lines: string[]; format: Format };
 
-type Block = { lines: string[]; format: Format };
-
-const LINE_FORMATS: readonly Format[] = ["box", "ascii", "markdown", "tsv", "csv"];
-
-/** ブロックの前後から説明文を切り落とし、その形式として判定できるものを候補にする */
-function blockCandidates(lines: readonly string[]): Block[] {
-  return LINE_FORMATS.flatMap((format) => {
-    const trimmed = format === "csv" ? trimCsvLines(lines) : trimNonTableLines(format, lines);
-    if (trimmed.length === 0) return [];
-    return detectFormat(trimmed.join("\n")).format === format ? [{ lines: trimmed, format }] : [];
+/**
+ * ブロックから表の候補を作る。
+ * - 罫線表・Markdown: 前後の説明文の行を切り落としてから判定する
+ * - CSV / TSV: ブロックの行を削らずにそのまま判定する（列数の違う行も表の一部として残す。Q10）
+ */
+function blockCandidates(block: readonly string[]): Candidate[] {
+  const structural = STRUCTURAL.flatMap((format) => {
+    const lines = trimNonTableLines(format, block);
+    if (lines.length === 0) return [];
+    return detectFormat(lines.join("\n")).format === format ? [{ lines, format }] : [];
   });
+  const whole = detectFormat(block.join("\n")).format;
+  const delimited = whole && DELIMITED.includes(whole) ? [{ lines: [...block], format: whole }] : [];
+  return [...structural, ...delimited];
 }
 
-function splitBlocks(text: string): Block[] {
-  return text
-    .split(/\r?\n(?:[ \t\u3000]*\r?\n)+/)
-    .map((chunk) => chunk.split(/\r?\n/).filter((line) => line.trim() !== ""))
-    .filter((lines) => lines.length > 0)
-    .flatMap(blockCandidates);
-}
-
-function pickBlock(blocks: readonly Block[]): Block | null {
-  let best: Block | null = null;
-  for (const block of blocks) {
-    if (!best || isBetter(block, best)) best = block;
+function pickBest(candidates: readonly Candidate[]): Candidate | null {
+  let best: Candidate | null = null;
+  for (const c of candidates) {
+    if (!best || isBetter(c, best)) best = c;
   }
   return best;
 }
 
-function isBetter(a: Block, b: Block): boolean {
+function isBetter(a: Candidate, b: Candidate): boolean {
   const pa = PRIORITY[a.format];
   const pb = PRIORITY[b.format];
   return pa !== pb ? pa > pb : a.lines.length > b.lines.length;
 }
 
-/** 先頭・末尾の空行だけを除く（行頭のタブは TSV の空セルなので残す） */
-function trimBlankLines(text: string): string {
-  return text.replace(/^(?:[ \t\u3000]*\n)+/, "").replace(/(?:\n[ \t\u3000]*)+$/, "");
+/** <table で始まる行から </table> までを取り出す（説明文中の「<table>」という文字列には反応しない） */
+function extractHtmlTable(text: string): string | null {
+  const lines = text.split("\n");
+  const startLine = lines.findIndex((line) => /^\s*<table[\s>]/i.test(line));
+  if (startLine === -1) return null;
+  const rest = lines.slice(startLine).join("\n");
+  const end = rest.toLowerCase().lastIndexOf("</table");
+  const close = end === -1 ? -1 : rest.indexOf(">", end);
+  if (close === -1) return null;
+  const candidate = rest.slice(0, close + 1).trim();
+  return looksLikeHtml(candidate) ? candidate : null;
 }
 
-/** 表の前後にある空行・説明文を除き、表部分だけを取り出す */
-export function extractTable(text: string): string {
-  if (looksLikeHtml(text)) return extractHtmlTable(text);
-  const json = extractJson(text);
-  if (json) return json;
-  const whole = detectFormat(text).format;
-  if (whole === "csv" || whole === "tsv") {
-    // 引用符内の改行・空行を壊さないよう、全体が区切り形式として揃っていればそのまま使う
-    const delimiter = whole === "tsv" ? "\t" : null;
-    const score = delimiter
-      ? delimiterScore(parseDelimitedRows(text.trim(), delimiter))
-      : Math.max(...CSV_DELIMITERS.map((d) => delimiterScore(parseDelimitedRows(text.trim(), d))));
-    if (score === 1) return trimBlankLines(text);
+/** [ で始まる行から ] で終わる行までを取り出す（セル内の [1] などには反応しない） */
+function extractJson(text: string): string | null {
+  const lines = text.split("\n");
+  const start = lines.findIndex((line) => line.trim().startsWith("["));
+  let end = -1;
+  for (let i = lines.length - 1; i >= start && start !== -1; i--) {
+    if (lines[i].trim().endsWith("]")) {
+      end = i;
+      break;
+    }
   }
-  const block = pickBlock(splitBlocks(text));
-  return block ? block.lines.join("\n") : trimBlankLines(text);
+  if (start === -1 || end === -1) return null;
+  const candidate = lines.slice(start, end + 1).join("\n").trim();
+  return looksLikeJson(candidate) ? candidate : null;
 }
 
-/** 変換前の前処理（Q9）。ANSI → コードフェンス → 表部分の抽出 → 共通インデントの順に適用する */
-export function preprocess(text: string, options: PreprocessOptions): string {
-  let out = text.replace(/\r\n?/g, "\n");
+/**
+ * 表の前後にある空行・説明文を除き、表部分だけを取り出す。
+ * 優先順: 入力全体が JSON / HTML → 罫線表・Markdown（構造で範囲が確定）→ HTML の table → JSON の配列 → CSV / TSV のブロック
+ */
+export function extractTable(text: string): Preprocessed {
+  const finish = (result: string): Preprocessed => ({
+    text: result,
+    removedLines: Math.max(0, countNonBlank(text) - countNonBlank(result)),
+  });
+  if (looksLikeJson(text) || looksLikeHtml(text)) return finish(trimBlankLines(text));
+  const candidates = splitBlocks(text).flatMap(blockCandidates);
+  const structural = pickBest(candidates.filter((c) => STRUCTURAL.includes(c.format)));
+  if (structural) return finish(structural.lines.join("\n"));
+  const html = extractHtmlTable(text);
+  if (html) return finish(html);
+  const json = extractJson(text);
+  if (json) return finish(json);
+  const delimited = pickBest(candidates);
+  return finish(delimited ? delimited.lines.join("\n") : trimBlankLines(text));
+}
+
+/**
+ * 変換前の前処理（Q9）。BOM 除去と改行の統一は常に行い、
+ * その後 ANSI → コードフェンス → 表部分の抽出 → 共通インデントの順に、有効なものを適用する。
+ */
+export function preprocess(text: string, options: PreprocessOptions): Preprocessed {
+  let out = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  let removedLines = 0;
   if (options.ansi) out = stripAnsi(out);
   if (options.fence) out = stripCodeFence(out);
-  if (options.extract) out = extractTable(out);
+  if (options.extract) {
+    const extracted = extractTable(out);
+    out = extracted.text;
+    removedLines = extracted.removedLines;
+  }
   if (options.indent) out = removeCommonIndent(out);
-  return out;
+  return { text: out, removedLines };
 }

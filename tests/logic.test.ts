@@ -66,38 +66,45 @@ describe("前処理（Q9）", () => {
     expect(removeCommonIndent("\ta\tb")).toBe("\ta\tb");
   });
 
-  it("表の前後の説明文・空行を除いて表部分を抽出する", () => {
+  it("表の前後の説明文・空行を除いて表部分を抽出し、除外行数を返す", () => {
     const text = "以下が結果です。\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n\n以上、よろしくお願いします。";
-    expect(extractTable(text)).toBe("| a | b |\n| --- | --- |\n| 1 | 2 |");
+    expect(extractTable(text)).toEqual({ text: "| a | b |\n| --- | --- |\n| 1 | 2 |", removedLines: 2 });
   });
 
-  it("空行を挟まない直前の説明文も切り落とす", () => {
-    expect(extractTable("表です:\n" + SMALL_INPUTS.box + "\n注: 単位は個")).toBe(SMALL_INPUTS.box);
+  it("罫線表は空行を挟まない直前・直後の説明文も切り落とす", () => {
+    expect(extractTable("表です:\n" + SMALL_INPUTS.box + "\n注: 単位は個")).toEqual({
+      text: SMALL_INPUTS.box,
+      removedLines: 2,
+    });
   });
 
-  it("HTML の前後のテキストを除く", () => {
-    expect(extractTable("<p>x</p><table><tr><td>1</td></tr></table><p>y</p>")).toBe(
+  it("HTML は <table で始まる行から </table> までを取り出す", () => {
+    expect(extractTable("説明\n<table><tr><td>1</td></tr></table>\n以上").text).toBe(
       "<table><tr><td>1</td></tr></table>",
     );
   });
 
-  it("CSV の前後の説明文を除く", () => {
-    expect(extractTable("売上データ\na,b,c\n1,2,3\n4,5,6\n出典: 社内")).toBe("a,b,c\n1,2,3\n4,5,6");
+  it("CSV は空行で区切られたブロック単位で説明文を除く", () => {
+    expect(extractTable("売上データ:\n\na,b,c\n1,2,3\n4,5,6\n\n出典: 社内").text).toBe("a,b,c\n1,2,3\n4,5,6");
+  });
+
+  it("CSV は空行で区切られていない行を説明文として削らない（Q10）", () => {
+    expect(extractTable("売上データ\na,b,c\n1,2,3").text).toBe("売上データ\na,b,c\n1,2,3");
   });
 
   it("引用符内に空行がある CSV は壊さない", () => {
     const csv = 'a,b\n"x\n\ny",2';
-    expect(extractTable(csv)).toBe(csv);
+    expect(extractTable(csv).text).toBe(csv);
   });
 
   it("全部まとめて: ANSI 色・コードフェンス・インデント・説明文を含む入力から表を取り出す", () => {
     const text = "結果:\n```\n  \u001b[1m| a | b |\u001b[0m\n  | --- | --- |\n  | 1 | 2 |\n```\n";
-    expect(preprocess(text, DEFAULT_PREPROCESS)).toBe("| a | b |\n| --- | --- |\n| 1 | 2 |");
+    expect(preprocess(text, DEFAULT_PREPROCESS)).toEqual({ text: "| a | b |\n| --- | --- |\n| 1 | 2 |", removedLines: 1 });
   });
 
   it("前処理を個別に無効化できる", () => {
     const text = "```\n| a |\n```";
-    expect(preprocess(text, { ...DEFAULT_PREPROCESS, fence: false, extract: false })).toBe(text);
+    expect(preprocess(text, { ...DEFAULT_PREPROCESS, fence: false, extract: false }).text).toBe(text);
   });
 });
 
@@ -153,7 +160,9 @@ describe("文字幅（Q23・Q24）", () => {
       expect(stringWidth(ch, N), ch).toBe(1);
       expect(stringWidth(ch, A2), ch).toBe(2);
     }
-    expect(stringWidth("−", A2)).toBe(1);
+    // U+2212 は Unicode 上 N だが、Q23 の注記に合わせて曖昧幅として扱う
+    expect(stringWidth("−", N)).toBe(1);
+    expect(stringWidth("−", A2)).toBe(2);
   });
 
   it("絵文字は 2（ZWJ 連結・肌色・国旗・VS16 を含む）", () => {

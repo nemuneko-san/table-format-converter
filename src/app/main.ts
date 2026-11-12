@@ -20,6 +20,13 @@ import { copyRichHtml, copyText, readClipboardText } from "./clipboard";
 import { renderPreview } from "./preview";
 
 const DRAFT_SAVE_DELAY_MS = 300;
+/**
+ * これより長い入力は、入力のたびに再変換せず少し待ってからまとめて変換する（Q11 の即時変換は小さい入力で維持）。
+ * 実測（Node 20、解析＋罫線表出力: 200×20・約 3.4 万文字で約 36ms、300×20・約 5.2 万文字で約 55ms、
+ * 2,000×20 で約 0.44 秒）から、1 回の変換がおおむね 40ms 以内に収まる 3 万文字をしきい値にする。
+ */
+export const LARGE_INPUT_CHARS = 30000;
+const LARGE_INPUT_DELAY_MS = 250;
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -101,6 +108,9 @@ export async function main(): Promise<void> {
   let table: Table | null = null;
   let headerOverride: boolean | null = null;
   let draftTimer: ReturnType<typeof setTimeout> | undefined;
+  let parseTimer: ReturnType<typeof setTimeout> | undefined;
+  // 保存済み設定を読めたか。読めていないときは既定値を sync に書き戻さない
+  let settingsLoaded = false;
 
   const setStatus = (message: string, kind: "info" | "warn" | "error" = "info"): void => {
     el.status.textContent = message;
@@ -126,8 +136,18 @@ export async function main(): Promise<void> {
     el.sourceCopy.hidden = !isHtml;
   };
 
+  const showError = (error: unknown): void => {
+    const detail = error instanceof Error ? error.message : String(error);
+    setStatus(`変換中にエラーが発生しました: ${detail}`, "error");
+  };
+
   const renderOutput = (): void => {
-    el.output.value = table ? serialize(table, current.outputFormat, current) : "";
+    try {
+      el.output.value = table ? serialize(table, current.outputFormat, current) : "";
+    } catch (error) {
+      el.output.value = "";
+      showError(error);
+    }
   };
 
   const renderHeader = (): void => {
@@ -187,10 +207,18 @@ export async function main(): Promise<void> {
     );
   };
 
+  /** 入力から表モデルを作り直す（プレビュー上の編集は破棄される）。入力の解釈が変わるときだけ呼ぶ */
   const reparse = (): void => {
-    outcome = parseInput(el.input.value, inputFormat, current.preprocess);
-    table = outcome.ok ? { ...outcome.table, header: headerOverride ?? outcome.detectedHeader } : null;
-    renderParseStatus();
+    clearTimeout(parseTimer);
+    try {
+      outcome = parseInput(el.input.value, inputFormat, current.preprocess);
+      table = outcome.ok ? { ...outcome.table, header: headerOverride ?? outcome.detectedHeader } : null;
+      renderParseStatus();
+    } catch (error) {
+      outcome = null;
+      table = null;
+      showError(error);
+    }
     renderAll();
   };
 
@@ -200,17 +228,25 @@ export async function main(): Promise<void> {
     reparse();
   }
 
+  const saveDraftNow = (): void => {
+    clearTimeout(draftTimer);
+    void saveDraft(el.input.value).catch(() => setStatus("入力内容を保存できませんでした。", "warn"));
+  };
+
   const scheduleDraftSave = (): void => {
     clearTimeout(draftTimer);
-    draftTimer = setTimeout(() => {
-      void saveDraft(el.input.value).catch(() => setStatus("入力内容を保存できませんでした。", "warn"));
-    }, DRAFT_SAVE_DELAY_MS);
+    draftTimer = setTimeout(saveDraftNow, DRAFT_SAVE_DELAY_MS);
   };
 
   const onInputChanged = (): void => {
     headerOverride = null;
     scheduleDraftSave();
-    reparse();
+    if (el.input.value.length <= LARGE_INPUT_CHARS) {
+      reparse();
+      return;
+    }
+    clearTimeout(parseTimer);
+    parseTimer = setTimeout(reparse, LARGE_INPUT_DELAY_MS);
   };
 
   const changeOption = (patch: Partial<Settings>): void => {
@@ -238,6 +274,7 @@ export async function main(): Promise<void> {
     const value = el.outputFormat.value;
     if (!isFormat(value)) return;
     changeOption({ outputFormat: value });
+    if (!settingsLoaded) return;
     stored = { ...stored, outputFormat: value };
     void saveSettings(stored).catch(() => setStatus("出力形式を保存できませんでした。", "warn"));
   });
@@ -282,21 +319,32 @@ export async function main(): Promise<void> {
   el.transpose.addEventListener("click", () => updateTable(transpose));
   el.openOptions.addEventListener("click", () => void chrome.runtime.openOptionsPage());
 
+  el.input.ownerDocument.defaultView?.addEventListener("pagehide", saveDraftNow);
+
+  // 出力系の設定変更は再描画だけにしてプレビュー上の編集を保つ。前処理が変わったときだけ入力から作り直す
   onSettingsChanged((next) => {
+    const preprocessChanged = JSON.stringify(stored.preprocess) !== JSON.stringify(next.preprocess);
     current = applyChangedDefaults(current, stored, next);
     stored = next;
-    reparse();
+    settingsLoaded = true;
+    if (preprocessChanged) reparse();
+    else renderAll();
   });
 
   renderAll();
+  let loadFailed = false;
   try {
     const [settings, draft] = await Promise.all([loadSettings(), loadDraft()]);
     stored = settings;
     current = normalizeSettings(settings);
+    settingsLoaded = true;
     el.input.value = draft;
   } catch {
-    setStatus("保存済みの設定・入力を読み込めませんでした。既定値で表示します。", "warn");
+    loadFailed = true;
   }
   reparse();
+  if (loadFailed) {
+    setStatus("保存済みの設定・入力を読み込めませんでした。既定値で表示します（設定は保存されません）。", "warn");
+  }
   el.input.focus();
 }

@@ -4,14 +4,25 @@ const BLOCK_TAGS = new Set(["P", "DIV", "LI", "UL", "OL", "H1", "H2", "H3", "H4"
 
 /** セルのテキスト。<br> とブロック要素の区切りをセル内改行にし、それ以外の空白は 1 個に詰める */
 export function cellText(node: Node): string {
-  return collect(node).replace(/[ \t\r\n\f]+/g, " ").replace(/ ?\u0000 ?/g, "\n").replace(/\n+/g, "\n").replace(/^\n|\n$/g, "");
+  return collect(node).replace(/[ \t\r\n\f]+/g, " ").replace(/ ?\u0000 ?/g, "\n").replace(/\n+/g, "\n").replace(/^[ \n]+|[ \n]+$/g, "");
+}
+
+/** 表示されない要素。中のテキストをセルに入れない */
+const HIDDEN_TAGS = new Set(["SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT"]);
+
+/** セル内に入れ子になった table。セルのテキストを半角スペースでつなぐ */
+function nestedTableText(table: Element): string {
+  const cells = tableRows(table).flatMap((tr) => directCells(tr));
+  return ` ${cells.map((cell) => collect(cell).replace(/\u0000/g, " ")).join(" ")} `;
 }
 
 function collect(node: Node): string {
   if (node.nodeType === 3) return node.textContent ?? "";
   if (node.nodeType !== 1) return "";
   const el = node as Element;
+  if (HIDDEN_TAGS.has(el.tagName)) return "";
   if (el.tagName === "BR") return "\u0000";
+  if (el.tagName === "TABLE") return nestedTableText(el);
   const inner = Array.from(el.childNodes).map(collect).join("");
   return BLOCK_TAGS.has(el.tagName) ? `\u0000${inner}\u0000` : inner;
 }
@@ -37,7 +48,7 @@ function buildGrid(rows: readonly Element[]): Grid {
   const aligns: Align[] = [];
   rows.forEach((tr, r) => {
     let c = 0;
-    for (const cell of Array.from(tr.children).filter((el) => el.tagName === "TD" || el.tagName === "TH")) {
+    for (const cell of directCells(tr)) {
       while (occupied[r][c]) c++;
       const colspan = spanOf(cell, "colspan");
       const rowspan = Math.min(spanOf(cell, "rowspan"), rows.length - r);
@@ -60,6 +71,10 @@ function fillSpan(cells: string[][], occupied: boolean[][], span: Span, value: s
   }
 }
 
+function directCells(tr: Element): Element[] {
+  return Array.from(tr.children).filter((el) => el.tagName === "TD" || el.tagName === "TH");
+}
+
 function tableRows(table: Element): Element[] {
   return Array.from(table.querySelectorAll("tr")).filter((tr) => tr.closest("table") === table);
 }
@@ -67,7 +82,7 @@ function tableRows(table: Element): Element[] {
 function hasHeaderRow(table: Element, first: Element | undefined): boolean | null {
   if (Array.from(table.children).some((el) => el.tagName === "THEAD")) return true;
   if (!first) return null;
-  const cells = Array.from(first.children).filter((el) => el.tagName === "TD" || el.tagName === "TH");
+  const cells = directCells(first);
   if (cells.length > 0 && cells.every((el) => el.tagName === "TH")) return true;
   return null;
 }

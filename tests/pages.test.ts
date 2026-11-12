@@ -3,6 +3,7 @@ import { main as appMain } from "../src/app/main";
 import { main as optionsMain } from "../src/options/main";
 import { installChromeMock, loadPageBody } from "./chrome-mock";
 import { SAMPLE_BOX } from "./fixtures";
+import { DEFAULT_SETTINGS } from "../src/lib/settings";
 import appHtml from "../src/app/index.html?raw";
 import optionsHtml from "../src/options/index.html?raw";
 
@@ -181,12 +182,16 @@ describe("オプションページの初期化", () => {
 });
 
 describe("大きい表のプレビュー省略（Q50）", () => {
+  // 3 万文字を超える入力は短い遅延のあとで変換する（B12）
+  beforeEach(() => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }));
+
   it("5,000 セルを超えるとプレビューだけ省略し、出力は行う", async () => {
     loadPageBody(appHtml);
     installChromeMock();
     await appMain();
     const big = Array.from({ length: 1001 }, (_, r) => Array.from({ length: 5 }, (_, c) => `r${r}c${c}`).join("\t")).join("\n");
     typeInto(byId("input"), big);
+    vi.advanceTimersByTime(300);
     expect(byId("preview").querySelector("table")).toBeNull();
     expect(byId("preview").textContent).toContain("プレビューを省略しました");
     expect(byId<HTMLTextAreaElement>("output").value.split("\n").length).toBe(1002);
@@ -198,6 +203,102 @@ describe("大きい表のプレビュー省略（Q50）", () => {
     await appMain();
     const rows = Array.from({ length: 1000 }, (_, r) => Array.from({ length: 5 }, (_, c) => `r${r}c${c}`).join("\t"));
     typeInto(byId("input"), rows.join("\n"));
+    vi.advanceTimersByTime(300);
     expect(byId("preview").querySelector("table")).not.toBeNull();
+  });
+});
+
+describe("B3 プレビュー上の編集と設定変更", () => {
+  beforeEach(() => {
+    loadPageBody(appHtml);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  });
+
+  function editFirstCell(value: string): void {
+    const cell = byId("preview").querySelector<HTMLElement>('td[data-row="1"][data-col="0"]');
+    if (!cell) throw new Error("cell not found");
+    cell.textContent = value;
+    cell.dispatchEvent(new Event("input"));
+  }
+
+  it("セル編集 → 出力系設定の変更（タブ内・出力形式・オプションページ）→ 編集が残る", async () => {
+    const { chrome } = installChromeMock();
+    await appMain();
+    typeInto(byId("input"), "a,b,c\n1,2,3");
+    editFirstCell("9");
+    byId<HTMLButtonElement>("transpose-button").click();
+    select(byId("output-format"), "csv");
+    await Promise.resolve();
+    expect(byId<HTMLTextAreaElement>("output").value).toBe("a,9\nb,2\nc,3");
+    select(byId("opt-csv-delimiter"), ";");
+    expect(byId<HTMLTextAreaElement>("output").value).toBe("a;9\nb;2\nc;3");
+    await chrome.storage.sync.set({ settings: { ...DEFAULT_SETTINGS, outputFormat: "csv", csvDelimiter: "|", boxStyle: "double" } });
+    expect(byId<HTMLTextAreaElement>("output").value).toBe("a|9\nb|2\nc|3");
+  });
+
+  it("入力形式の手動変更・前処理設定の変更では入力から作り直す", async () => {
+    const { chrome } = installChromeMock();
+    await appMain();
+    select(byId("output-format"), "csv");
+    typeInto(byId("input"), "a,b\n1,2");
+    editFirstCell("9");
+    expect(byId<HTMLTextAreaElement>("output").value).toBe("a,b\n9,2");
+    select(byId("input-format"), "csv");
+    expect(byId<HTMLTextAreaElement>("output").value).toBe("a,b\n1,2");
+    editFirstCell("9");
+    await chrome.storage.sync.set({
+      settings: { ...DEFAULT_SETTINGS, outputFormat: "csv", preprocess: { ...DEFAULT_SETTINGS.preprocess, ansi: false } },
+    });
+    expect(byId<HTMLTextAreaElement>("output").value).toBe("a,b\n1,2");
+  });
+});
+
+describe("B5〜B7・B13 の UI 修正", () => {
+  beforeEach(() => {
+    loadPageBody(appHtml);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  });
+
+  it("B6 プレビューのセルは plaintext-only で編集する", async () => {
+    installChromeMock();
+    await appMain();
+    typeInto(byId("input"), "a,b\n1,2");
+    const cell = byId("preview").querySelector("td");
+    expect(cell?.getAttribute("contenteditable")).toBe("plaintext-only");
+  });
+
+  it("B7 設定の読み込みに失敗したら、出力形式を変えても既定値を sync に書き戻さない", async () => {
+    const { chrome } = installChromeMock();
+    chrome.storage.sync.get.mockRejectedValueOnce(new Error("quota"));
+    await appMain();
+    expect(byId("status").textContent).toContain("読み込めませんでした");
+    select(byId("output-format"), "csv");
+    await Promise.resolve();
+    expect(chrome.storage.sync.set).not.toHaveBeenCalled();
+  });
+
+  it("B13(d) pagehide で下書きを即時保存する", async () => {
+    const { local } = installChromeMock();
+    await appMain();
+    typeInto(byId("input"), "x,y");
+    expect(local.draft).toBeUndefined();
+    window.dispatchEvent(new Event("pagehide"));
+    expect(local.draft).toBe("x,y");
+  });
+
+  it("B13(g) 1 列だけの表では列の削除ボタンを押せない", async () => {
+    installChromeMock();
+    await appMain();
+    select(byId("input-format"), "csv");
+    typeInto(byId("input"), "a\n1");
+    const del = byId("preview").querySelector<HTMLButtonElement>('button[aria-label="1 列目を削除"]');
+    expect(del?.disabled).toBe(true);
+  });
+
+  it("B12 3 万文字以下の入力は即時に変換する（Q11）", async () => {
+    installChromeMock();
+    await appMain();
+    typeInto(byId("input"), "a,b\n1,2");
+    expect(byId<HTMLTextAreaElement>("output").value).not.toBe("");
   });
 });

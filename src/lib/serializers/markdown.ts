@@ -1,16 +1,16 @@
 import { effectiveAligns } from "../align";
 import type { Align, Table } from "../model";
 import type { WidthOptions } from "../width";
-import { columnWidths, padCell } from "./layout";
+import { measure, padCell } from "./layout";
 
 export type MarkdownOptions = WidthOptions & {
   /** 桁を揃えて整形する（Q25。既定は整形なし） */
   pad: boolean;
 };
 
-/** セルを Markdown 用にエスケープする（| → \|、改行 → <br>。Q30・Q31） */
+/** セルを Markdown 用にエスケープする（| → \|、改行 → <br>、タブ → 半角スペース。Q30・Q31） */
 export function escapeMarkdownCell(cell: string): string {
-  return cell.replace(/\|/g, "\\|").replace(/\n/g, "<br>");
+  return cell.replace(/\|/g, "\\|").replace(/\n/g, "<br>").replace(/\t/g, " ");
 }
 
 /** 区切りセル。width はコロンを含めた全体の幅（最小 3 本の - は常に確保する） */
@@ -46,10 +46,11 @@ export function toMarkdown(table: Table, options: MarkdownOptions): string {
     return [plainLine(header), sep, ...body.map(plainLine)].join("\n");
   }
   const minWidths = aligns.map((a) => (a === "center" ? 5 : a === "none" ? 3 : 4));
-  const widths = columnWidths([header, ...body], options).map((w, c) => Math.max(minWidths[c], w));
+  const measured = measure([header, ...body], options);
+  const widths = measured.columnWidths.map((w, c) => Math.max(minWidths[c], w));
   // ヘッダー行は左詰め、データ行は列の揃えに従って詰める（Q25 の例と同じ）
-  const line = (row: readonly string[], isHeader = false): string =>
-    paddedLine(row.map((cell, c) => padCell(cell, widths[c], isHeader ? "none" : aligns[c], options)));
+  const line = (row: readonly string[], r: number): string =>
+    paddedLine(row.map((cell, c) => padCell(cell, measured.cellWidths[r][c], widths[c], r === 0 ? "none" : aligns[c])));
   const sep = paddedLine(aligns.map((a, c) => separatorCell(a, widths[c])));
-  return [line(header, true), sep, ...body.map((row) => line(row))].join("\n");
+  return [line(header, 0), sep, ...body.map((row, i) => line(row, i + 1))].join("\n");
 }

@@ -7,8 +7,10 @@ export function transpose(table: Table): Table {
   return { ...table, rows, inputAligns: null };
 }
 
-/** 列を削除する（Q40） */
+/** 列を削除する（Q40）。最後の 1 列は削除しない（列の無い表を作らない） */
 export function deleteColumn(table: Table, col: number): Table {
+  const cols = table.rows[0]?.length ?? 0;
+  if (cols <= 1 || col < 0 || col >= cols) return table;
   return {
     ...table,
     rows: table.rows.map((row) => row.filter((_, c) => c !== col)),

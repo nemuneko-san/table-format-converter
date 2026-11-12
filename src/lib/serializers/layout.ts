@@ -1,17 +1,29 @@
 import type { Align } from "../model";
 import { stringWidth, type WidthOptions } from "../width";
 
-/** 列ごとの最大表示幅 */
-export function columnWidths(rows: readonly (readonly string[])[], options: WidthOptions): number[] {
+/** セルごとの表示幅と、列ごとの最大幅。幅は 1 回だけ計算して使い回す */
+export type Measured = {
+  cellWidths: number[][];
+  columnWidths: number[];
+};
+
+export function measure(rows: readonly (readonly string[])[], options: WidthOptions): Measured {
   const cols = rows[0]?.length ?? 0;
-  return Array.from({ length: cols }, (_, c) =>
-    rows.reduce((max, row) => Math.max(max, stringWidth(row[c] ?? "", options)), 0),
+  const columnWidths = Array.from({ length: cols }, () => 0);
+  const cellWidths = rows.map((row) =>
+    row.map((cell, c) => {
+      const w = stringWidth(cell, options);
+      if (w > columnWidths[c]) columnWidths[c] = w;
+      return w;
+    }),
   );
+  return { cellWidths, columnWidths };
 }
 
-/** 表示幅 width になるよう空白で埋める。right は右寄せ、center は中央、それ以外は左寄せ */
-export function padCell(text: string, width: number, align: Align, options: WidthOptions): string {
-  const gap = Math.max(0, width - stringWidth(text, options));
+/** 表示幅 textWidth の文字列を width になるよう空白で埋める。right は右寄せ、center は中央、それ以外は左寄せ */
+export function padCell(text: string, textWidth: number, width: number, align: Align): string {
+  const gap = Math.max(0, width - textWidth);
+  if (gap === 0) return text;
   if (align === "right") return " ".repeat(gap) + text;
   if (align === "center") {
     const left = Math.floor(gap / 2);

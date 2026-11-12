@@ -1,5 +1,5 @@
-import { FORMATS, type Format } from "./model";
-import { CSV_DELIMITERS, delimiterScore, parseDelimitedRows } from "./parsers/delimited";
+import { columnCount, FORMATS, type Format } from "./model";
+import { CSV_DELIMITERS, parseDelimitedRows } from "./parsers/delimited";
 import { PARSERS } from "./parsers/index";
 import { isSeparatorLine } from "./parsers/markdown";
 import { isAsciiBorderLine, isBoxBorderLine } from "./parsers/ruled";
@@ -20,19 +20,22 @@ function nonEmptyLines(text: string): string[] {
     .filter((line) => line !== "");
 }
 
+/** 先頭が [ / { で JSON として読める入力か（表の構造でなくても JSON とみなし、解析時にその理由を示す） */
 export function looksLikeJson(text: string): boolean {
   const t = text.trim();
-  if (!t.startsWith("[")) return false;
+  if (!t.startsWith("[") && !t.startsWith("{")) return false;
   try {
-    PARSERS.json(t);
+    JSON.parse(t);
     return true;
   } catch {
     return false;
   }
 }
 
+/** HTML の表か。先頭がタグで、table の開始・終了タグとセルのタグがそろっているときだけ true */
 export function looksLikeHtml(text: string): boolean {
-  return /<table[\s>]/i.test(text);
+  const t = text.trim();
+  return t.startsWith("<") && /<table[\s>]/i.test(t) && /<\/table\s*>/i.test(t) && /<t[dh][\s>]/i.test(t);
 }
 
 /** 罫線文字の表の行か（横罫線、または縦罫線で始まる行） */
@@ -61,13 +64,22 @@ export function looksLikeMarkdown(lines: readonly string[]): boolean {
   return lines.every((line) => line.startsWith("|") && line.endsWith("|") && line.length >= 2);
 }
 
-export function looksLikeTsv(text: string, lines: readonly string[]): boolean {
-  if (!lines.some((line) => line.includes("\t"))) return false;
-  return delimiterScore(parseDelimitedRows(text.trim(), "\t")) >= 0.5;
+/**
+ * 区切り文字 delimiter で読んだとき表らしいか。半数以上の行が 2 列以上なら true。
+ * 列数が行ごとに不揃いでも判定する（不揃いは解析後に空セルで補い警告する。Q10）。
+ */
+export function looksDelimited(text: string, delimiter: string): boolean {
+  const rows = parseDelimitedRows(text.trim(), delimiter).filter((row) => !(row.length === 1 && row[0].trim() === ""));
+  const wide = rows.filter((row) => row.length >= 2).length;
+  return wide > 0 && wide * 2 >= rows.length;
+}
+
+export function looksLikeTsv(text: string): boolean {
+  return text.includes("\t") && looksDelimited(text, "\t");
 }
 
 export function looksLikeCsv(text: string): boolean {
-  return CSV_DELIMITERS.some((d) => delimiterScore(parseDelimitedRows(text.trim(), d)) >= 0.8);
+  return CSV_DELIMITERS.some((d) => text.includes(d) && looksDelimited(text, d));
 }
 
 /** 解析できる形式を候補として列挙する（2 列以上になる形式を先に並べる） */
@@ -75,7 +87,8 @@ export function parseableFormats(text: string): Format[] {
   const results = FORMATS.flatMap((format) => {
     try {
       const raw = PARSERS[format](text);
-      return raw.rows.length > 0 ? [{ format, wide: raw.rows.some((row) => row.length >= 2) }] : [];
+      const cols = columnCount(raw.rows);
+      return cols > 0 ? [{ format, wide: cols >= 2 }] : [];
     } catch {
       return [];
     }
@@ -99,8 +112,7 @@ export function detectFormat(text: string): Detection {
   if (text.trim() === "") return { format: null, candidates: [] };
   const strong = detectStrong(text);
   if (strong) return { format: strong, candidates: [] };
-  const lines = nonEmptyLines(text);
-  if (looksLikeTsv(text, lines)) return { format: "tsv", candidates: [] };
+  if (looksLikeTsv(text)) return { format: "tsv", candidates: [] };
   if (looksLikeCsv(text)) return { format: "csv", candidates: [] };
   return { format: null, candidates: parseableFormats(text) };
 }

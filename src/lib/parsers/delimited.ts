@@ -7,6 +7,8 @@ import type { RawTable } from "../model";
  */
 export function parseDelimitedRows(text: string, delimiter: string): string[][] {
   const src = text.replace(/\r\n?/g, "\n").replace(/\n+$/, "");
+  // 引用符が無ければ単純な分割と同じ結果になる（大きな表の高速経路）
+  if (!src.includes('"')) return src.split("\n").map((line) => line.split(delimiter));
   const rows: string[][] = [];
   let row: string[] = [];
   let i = 0;
@@ -72,18 +74,20 @@ export function parseTsv(text: string): RawTable {
 export const CSV_DELIMITERS = [",", ";", "|"] as const;
 export type CsvDelimiter = (typeof CSV_DELIMITERS)[number];
 
-/** 行ごとのフィールド数が最も揃い、かつ 2 列以上になる区切り文字を選ぶ */
-export function detectCsvDelimiter(text: string): CsvDelimiter {
-  let best: CsvDelimiter = ",";
-  let bestScore = -1;
+/** 行ごとのフィールド数が最も揃い、かつ 2 列以上になる区切り文字で解析した結果（入力に無い区切り文字は試さない） */
+function bestDelimited(text: string): { delimiter: CsvDelimiter; rows: string[][] } {
+  let best: { delimiter: CsvDelimiter; rows: string[][]; score: number } | null = null;
   for (const delimiter of CSV_DELIMITERS) {
-    const score = delimiterScore(parseDelimitedRows(text, delimiter));
-    if (score > bestScore) {
-      best = delimiter;
-      bestScore = score;
-    }
+    if (!text.includes(delimiter)) continue;
+    const rows = parseDelimitedRows(text, delimiter);
+    const score = delimiterScore(rows);
+    if (!best || score > best.score) best = { delimiter, rows, score };
   }
-  return best;
+  return best ?? { delimiter: ",", rows: parseDelimitedRows(text, ",") };
+}
+
+export function detectCsvDelimiter(text: string): CsvDelimiter {
+  return bestDelimited(text).delimiter;
 }
 
 /** 列数 2 以上で揃っている行の割合（0〜1）。列数 1 しかなければ 0 */
@@ -105,6 +109,6 @@ export function delimiterScore(rows: readonly string[][]): number {
 }
 
 export function parseCsv(text: string): RawTable {
-  const rows = parseDelimitedRows(text, detectCsvDelimiter(text)).filter((row) => !isBlankRow(row));
+  const rows = bestDelimited(text).rows.filter((row) => !isBlankRow(row));
   return { rows, header: null, inputAligns: null };
 }
