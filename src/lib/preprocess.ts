@@ -225,7 +225,7 @@ export function extractTable(text: string): Preprocessed {
 
 /**
  * 1 つのフェンスの内側から表の候補を作る。内側の空行ではブロックを分けない（1 フェンス = 1 候補）。
- * strict のときは、CSV / TSV を「2 列以上の行が 2 行以上」に限る（`console.log(a, b)` のようなコード 1 行を表とみなさない）。
+ * strict のときは、CSV / TSV を「2 列以上の行が 2 行以上」に限る（`f(a, b)` のような関数呼び出し 1 行を表とみなさない）。
  */
 function fenceCandidates(lines: readonly string[], strict: boolean): Candidate[] {
   const text = lines.join("\n");
