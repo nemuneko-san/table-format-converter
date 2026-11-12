@@ -179,3 +179,25 @@ describe("オプションページの初期化", () => {
     await vi.waitFor(() => expect((sync.settings as { markdownPad: boolean }).markdownPad).toBe(true));
   });
 });
+
+describe("大きい表のプレビュー省略（Q50）", () => {
+  it("5,000 セルを超えるとプレビューだけ省略し、出力は行う", async () => {
+    loadPageBody(appHtml);
+    installChromeMock();
+    await appMain();
+    const big = Array.from({ length: 1001 }, (_, r) => Array.from({ length: 5 }, (_, c) => `r${r}c${c}`).join("\t")).join("\n");
+    typeInto(byId("input"), big);
+    expect(byId("preview").querySelector("table")).toBeNull();
+    expect(byId("preview").textContent).toContain("プレビューを省略しました");
+    expect(byId<HTMLTextAreaElement>("output").value.split("\n").length).toBe(1002);
+  });
+
+  it("5,000 セル以下ならプレビューを表示する", async () => {
+    loadPageBody(appHtml);
+    installChromeMock();
+    await appMain();
+    const rows = Array.from({ length: 1000 }, (_, r) => Array.from({ length: 5 }, (_, c) => `r${r}c${c}`).join("\t"));
+    typeInto(byId("input"), rows.join("\n"));
+    expect(byId("preview").querySelector("table")).not.toBeNull();
+  });
+});
