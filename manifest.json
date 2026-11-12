@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Table Format Converter",
+  "version": "1.0.0",
+  "description": "Markdown / TSV / CSV / 罫線表 / HTML / JSON の表を相互に変換します（外部通信なし）",
+  "minimum_chrome_version": "116",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Table Format Converter を開く",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  },
+  "options_page": "src/options/index.html",
+  "permissions": ["storage", "clipboardRead", "clipboardWrite"]
+}
