@@ -141,7 +141,7 @@ describe("変換タブの統合動作", () => {
     await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(byId<HTMLTextAreaElement>("output").value));
   });
 
-  it("クリップボードから貼り付けボタンで入力欄に読み込む（Q13）", async () => {
+  it("「貼り付け」ボタンでクリップボードから入力欄に読み込む（Q13）", async () => {
     installChromeMock();
     vi.stubGlobal("navigator", { ...navigator, clipboard: { readText: vi.fn(async () => "x\ty\n1\t2") } });
     await appMain();

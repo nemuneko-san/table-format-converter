@@ -21,7 +21,8 @@
         <section class="card pane" aria-labelledby="input-title">
           <div class="card-head">
             <h2 id="input-title">入力</h2>
-            <span id="detected" class="meta"></span>
+            <span id="input-status" class="local-status" role="status" aria-live="polite"></span>
+            <button type="button" id="undo-clear-button" class="secondary" hidden>クリアを取り消す</button>
           </div>
           <div class="toolbar">
             <label class="field">
@@ -29,10 +30,13 @@
               <select id="input-format"></select>
             </label>
             <span class="toolbar-end">
-              <button type="button" id="paste-button" class="secondary">クリップボードから貼り付け</button>
+              <button type="button" id="paste-button" class="secondary" title="クリップボードの内容を入力欄に貼り付けます">
+                貼り付け
+              </button>
               <button type="button" id="clear-button" class="destructive">クリア</button>
             </span>
           </div>
+          <p class="card-note"><span id="detected" class="meta"></span></p>
           <textarea
             id="input"
             class="mono workarea"
@@ -49,6 +53,7 @@
         <section class="card pane" aria-labelledby="output-title">
           <div class="card-head">
             <h2 id="output-title">出力</h2>
+            <span id="copy-status" class="local-status" role="status" aria-live="polite"></span>
             <span class="toolbar-end">
               <button type="button" id="copy-button" class="primary">コピー</button>
               <button type="button" id="rich-copy-button" class="primary" hidden>リッチコピー</button>
@@ -60,12 +65,8 @@
               形式
               <select id="output-format"></select>
             </label>
-            <label
-              class="field"
-              data-formats="markdown"
-              title="列の幅を空白で揃え、テキストのままでも表として読めるようにします。Markdown として表示した結果は変わりません"
-            >
-              <input type="checkbox" id="opt-markdown-pad" />
+            <label class="field" data-formats="markdown">
+              <input type="checkbox" id="opt-markdown-pad" aria-describedby="hint-markdown-pad" />
               桁を揃える
             </label>
             <label class="field" data-formats="box">
@@ -80,9 +81,9 @@
                 <option value="|">パイプ |</option>
               </select>
             </label>
-            <label class="field" data-formats="html" title="枠線と余白あり: 貼り付け先でも罫線が付くよう、セルに inline style を付けます">
+            <label class="field" data-formats="html">
               スタイル
-              <select id="opt-html-style"></select>
+              <select id="opt-html-style" aria-describedby="hint-html-style"></select>
             </label>
             <label class="field" data-formats="json">
               構造
@@ -120,27 +121,27 @@
               </div>
             </details>
           </div>
+          <p class="card-note">
+            <span id="hint-markdown-pad" class="meta" data-formats="markdown">桁を揃える: 列の幅を空白で揃えます（表示結果は同じ）</span>
+            <span id="hint-html-style" class="meta" data-formats="html">枠線と余白あり: 貼り付け先でも罫線が付きます</span>
+          </p>
           <textarea id="output" class="mono workarea" spellcheck="false" readonly aria-labelledby="output-title"></textarea>
         </section>
       </main>
 
-      <div class="feedback">
-        <div id="status" class="status" role="status" aria-live="polite"></div>
-        <button type="button" id="undo-clear-button" class="secondary" aria-label="元に戻す: クリアした入力" hidden>
-          元に戻す
-        </button>
-      </div>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
 
       <section class="card preview-section" aria-labelledby="preview-title">
         <div class="card-head">
           <h2 id="preview-title">プレビュー</h2>
           <span id="edit-state" class="edit-state" hidden>編集中の内容があります</span>
+          <span id="preview-status" class="local-status" role="status" aria-live="polite"></span>
           <span class="toolbar-end">
-            <button type="button" id="undo-button" class="secondary" aria-label="元に戻す: プレビューの編集">
+            <button type="button" id="undo-button" class="secondary">
               <svg class="button-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                 <path d="M5.5 3.5 2.5 6.5l3 3M2.5 6.5h7a4 4 0 0 1 0 8H7" />
               </svg>
-              元に戻す
+              編集を元に戻す
             </button>
             <button type="button" id="transpose-button" class="secondary">行列を入れ替え</button>
           </span>

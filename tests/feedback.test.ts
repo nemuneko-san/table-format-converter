@@ -23,6 +23,8 @@ function select(el: HTMLSelectElement, value: string): void {
 
 const output = (): string => byId<HTMLTextAreaElement>("output").value;
 const status = (): HTMLElement => byId("status");
+const inputStatus = (): HTMLElement => byId("input-status");
+const copyStatus = (): HTMLElement => byId("copy-status");
 
 function editCell(row: number, col: number, value: string): void {
   const cell = byId("preview").querySelector<HTMLElement>(`[data-row="${row}"][data-col="${col}"]`);
@@ -88,6 +90,7 @@ describe("プレビューの編集を元に戻す", () => {
     expect(undo.disabled).toBe(false);
     undo.click();
     expect(output()).toBe("c,a\n3,9");
+    expect(byId("preview-status").textContent).toBe("1 つ前の状態に戻しました。");
     undo.click();
     expect(output()).toBe("a,c\n9,3");
     undo.click();
@@ -136,25 +139,43 @@ describe("プレビューの編集を元に戻す", () => {
   });
 });
 
-describe("列操作ボタン", () => {
+describe("列の操作メニュー", () => {
   beforeEach(() => loadPageBody(appHtml));
 
-  it("1 行目の各セルの中に、左へ移動・右へ移動・列を削除のボタンがあり、title と aria-label が同じ", async () => {
+  it("1 行目の各セルに「列の操作」ボタンが 1 つあり、文字ラベル付きの 3 項目のメニュー（popover）を開く", async () => {
     installChromeMock();
     await appMain();
     typeInto(byId("input"), "a,b\n1,2");
     const firstRow = byId("preview").querySelector("tr");
     const cells = firstRow ? Array.from(firstRow.children) : [];
     expect(cells.length).toBe(2);
-    const labels = cells.map((cell) => Array.from(cell.querySelectorAll("button")).map((b) => b.getAttribute("aria-label")));
-    expect(labels).toEqual([
-      ["左へ移動（1 列目）", "右へ移動（1 列目）", "列を削除（1 列目）"],
-      ["左へ移動（2 列目）", "右へ移動（2 列目）", "列を削除（2 列目）"],
-    ]);
-    for (const b of Array.from(byId("preview").querySelectorAll("button"))) {
-      expect(b.title).toBe(b.getAttribute("aria-label"));
-    }
+    cells.forEach((cell, c) => {
+      const trigger = cell.querySelector<HTMLButtonElement>(".col-menu-button");
+      expect(trigger?.getAttribute("aria-label")).toBe(`列の操作（${c + 1} 列目）`);
+      expect(trigger?.title).toBe(trigger?.getAttribute("aria-label"));
+      const menu = cell.querySelector<HTMLElement>(".col-menu-list");
+      expect(menu?.getAttribute("popover")).toBe("auto");
+      expect(trigger?.getAttribute("popovertarget")).toBe(menu?.id);
+      const items = Array.from(menu?.querySelectorAll("button") ?? []);
+      expect(items.map((b) => b.textContent)).toEqual(["左へ移動", "右へ移動", "列を削除"]);
+      expect(items.map((b) => b.getAttribute("aria-label"))).toEqual([
+        `左へ移動（${c + 1} 列目）`,
+        `右へ移動（${c + 1} 列目）`,
+        `列を削除（${c + 1} 列目）`,
+      ]);
+      for (const b of items) expect(b.title).toBe(b.getAttribute("aria-label"));
+    });
+    // 端の列では動かせない方向を押せない
+    expect(byId<HTMLButtonElement>("col-menu-0").querySelector("button")?.disabled).toBe(true);
     expect(byId("preview").querySelector("tr.col-controls")).toBeNull();
+  });
+
+  it("列を動かすと、移動先の列の「列の操作」ボタンにフォーカスが戻る", async () => {
+    installChromeMock();
+    await appMain();
+    typeInto(byId("input"), "a,b,c\n1,2,3");
+    columnButton("右へ移動（1 列目）").click();
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("列の操作（2 列目）");
   });
 });
 
@@ -164,7 +185,7 @@ describe("クリアを元に戻す", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   });
 
-  it("クリア直後に「元に戻す」が出て、押すと入力と出力が戻る", async () => {
+  it("クリア直後に「クリアを取り消す」が出て、押すと入力と出力が戻る", async () => {
     installChromeMock();
     await appMain();
     select(byId("output-format"), "csv");
@@ -174,15 +195,51 @@ describe("クリアを元に戻す", () => {
     byId<HTMLButtonElement>("clear-button").click();
     expect(byId<HTMLTextAreaElement>("input").value).toBe("");
     expect(output()).toBe("");
-    expect(status().textContent).toBe("入力をクリアしました。");
+    expect(inputStatus().textContent).toBe("入力をクリアしました。");
     expect(undoClear.hidden).toBe(false);
+    expect(undoClear.textContent).toBe("クリアを取り消す");
     undoClear.click();
     expect(byId<HTMLTextAreaElement>("input").value).toBe("a\tb\n1\t2");
     expect(output()).toBe("a,b\n1,2");
     expect(undoClear.hidden).toBe(true);
+    expect(inputStatus().textContent).toBe("クリアを取り消しました。");
   });
 
-  it("クリアのあとに入力すると「元に戻す」は消える", async () => {
+  it("クリアを取り消すと、プレビューの編集・編集の履歴・見出しの指定までクリア前と同じに戻る", async () => {
+    installChromeMock();
+    await appMain();
+    select(byId("output-format"), "csv");
+    typeInto(byId("input"), "a,b\n1,2");
+    editCell(1, 0, "555");
+    blurCell(1, 0);
+    const toggle = byId<HTMLInputElement>("header-toggle");
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event("change"));
+    const before = {
+      output: output(),
+      preview: byId("preview").innerHTML,
+      editState: byId("edit-state").hidden,
+      undo: byId<HTMLButtonElement>("undo-button").disabled,
+      header: toggle.checked,
+      mode: byId("header-mode").textContent,
+    };
+    expect(before.output).toBe("a,b\n555,2");
+    byId<HTMLButtonElement>("clear-button").click();
+    byId<HTMLButtonElement>("undo-clear-button").click();
+    expect({
+      output: output(),
+      preview: byId("preview").innerHTML,
+      editState: byId("edit-state").hidden,
+      undo: byId<HTMLButtonElement>("undo-button").disabled,
+      header: toggle.checked,
+      mode: byId("header-mode").textContent,
+    }).toEqual(before);
+    // 履歴も戻っているので、編集を元に戻せる
+    byId<HTMLButtonElement>("undo-button").click();
+    expect(output()).toBe("a,b\n1,2");
+  });
+
+  it("クリアのあとに入力すると「クリアを取り消す」は消える", async () => {
     installChromeMock();
     await appMain();
     typeInto(byId("input"), "a,b\n1,2");
@@ -204,14 +261,13 @@ describe("操作結果のメッセージ", () => {
     await appMain();
     byId<HTMLButtonElement>("paste-button").click();
     await vi.waitFor(() => expect(byId<HTMLTextAreaElement>("input").value).toBe(SAMPLE_BOX));
-    expect(status().textContent).toBe("5 行 × 4 列を読み込みました（罫線文字の表。1 行目を見出しとして扱います）。");
-    expect(status().dataset.kind).toBe("success");
-    expect(status().getAttribute("aria-live")).toBe("polite");
-    // 入力区画の見出しの件数は、プレビューの行数（見出し行を含む）と同じ数え方
-    expect(byId("detected").textContent).toBe("罫線文字の表（自動判定）・5 行 × 4 列");
+    expect(inputStatus().textContent).toBe("5 行 × 4 列を読み込みました（罫線文字の表）。");
+    expect(inputStatus().getAttribute("aria-live")).toBe("polite");
+    // 入力区画の件数は入力の件数と分かる文言で、プレビューの行数（見出し行を含む）と同じ数え方
+    expect(byId("detected").textContent).toBe("罫線文字の表（自動判定）・入力は 5 行 × 4 列");
     expect(byId("preview").querySelectorAll("tr").length).toBe(5);
     vi.advanceTimersByTime(FLASH_MS);
-    expect(status().textContent).toBe("");
+    expect(inputStatus().textContent).toBe("");
   });
 
   it("Ctrl+V の貼り付けでも知らせ、手入力では知らせない", async () => {
@@ -219,10 +275,10 @@ describe("操作結果のメッセージ", () => {
     await appMain();
     const input = byId<HTMLTextAreaElement>("input");
     typeInto(input, "a,b\n1,2");
-    expect(status().textContent).toBe("");
+    expect(inputStatus().textContent).toBe("");
     input.dispatchEvent(new Event("paste"));
     typeInto(input, "a,b\n1,2\n3,4");
-    expect(status().textContent).toContain("3 行 × 2 列を読み込みました（CSV");
+    expect(inputStatus().textContent).toContain("3 行 × 2 列を読み込みました（CSV");
   });
 
   it("コピー・ソースコピー・リッチコピーの成功を区別して知らせる", async () => {
@@ -239,12 +295,15 @@ describe("操作結果のメッセージ", () => {
     await appMain();
     typeInto(byId("input"), "a,b\n1,2");
     byId<HTMLButtonElement>("copy-button").click();
-    await vi.waitFor(() => expect(status().textContent).toBe("コピーしました。"));
+    await vi.waitFor(() => expect(copyStatus().textContent).toBe("コピーしました。"));
+    expect(copyStatus().getAttribute("aria-live")).toBe("polite");
     select(byId("output-format"), "html");
     byId<HTMLButtonElement>("source-copy-button").click();
-    await vi.waitFor(() => expect(status().textContent).toBe("HTML のソースをコピーしました。"));
+    await vi.waitFor(() => expect(copyStatus().textContent).toBe("HTML のソースをコピーしました。"));
     byId<HTMLButtonElement>("rich-copy-button").click();
-    await vi.waitFor(() => expect(status().textContent).toBe("リッチテキスト（表）としてコピーしました。"));
+    await vi.waitFor(() => expect(copyStatus().textContent).toBe("リッチテキスト（表）としてコピーしました。"));
+    vi.advanceTimersByTime(FLASH_MS);
+    expect(copyStatus().textContent).toBe("");
   });
 
   it("コピーに失敗したらエラーを出し、時間がたっても消さない", async () => {
@@ -258,7 +317,7 @@ describe("操作結果のメッセージ", () => {
     expect(status().textContent).toBe("クリップボードにコピーできませんでした。");
   });
 
-  it("警告が出ている間にコピーすると、成功メッセージのあとで警告に戻る", async () => {
+  it("警告が出ている間にコピーしても、警告は状態行に残り、成功はコピーボタンの近くに出る", async () => {
     installChromeMock();
     vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText: vi.fn(async () => undefined) } });
     await appMain();
@@ -266,7 +325,8 @@ describe("操作結果のメッセージ", () => {
     expect(status().dataset.kind).toBe("warn");
     const warning = status().textContent;
     byId<HTMLButtonElement>("copy-button").click();
-    await vi.waitFor(() => expect(status().textContent).toBe("コピーしました。"));
+    await vi.waitFor(() => expect(copyStatus().textContent).toBe("コピーしました。"));
+    expect(status().textContent).toBe(warning);
     vi.advanceTimersByTime(FLASH_MS);
     expect(status().textContent).toBe(warning);
     expect(status().dataset.kind).toBe("warn");
@@ -300,5 +360,25 @@ describe("押せない状態と判定失敗の表示", () => {
     // ほかのエラーは隠さない
     typeInto(byId("input"), "");
     expect(status().classList.contains("sr-only")).toBe(false);
+  });
+});
+
+describe("作業画面の設定の補足", () => {
+  beforeEach(() => loadPageBody(appHtml));
+
+  it("桁を揃える（Markdown）とスタイル（HTML）の補足を、その形式のときだけ画面に出す", async () => {
+    installChromeMock();
+    await appMain();
+    const pad = byId("hint-markdown-pad");
+    const html = byId("hint-html-style");
+    expect(pad.hidden).toBe(false);
+    expect(html.hidden).toBe(true);
+    expect(byId("opt-markdown-pad").getAttribute("aria-describedby")).toBe("hint-markdown-pad");
+    select(byId("output-format"), "html");
+    expect(pad.hidden).toBe(true);
+    expect(html.hidden).toBe(false);
+    expect(byId("opt-html-style").getAttribute("aria-describedby")).toBe("hint-html-style");
+    select(byId("output-format"), "csv");
+    expect(pad.hidden && html.hidden).toBe(true);
   });
 });

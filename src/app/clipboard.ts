@@ -1,4 +1,4 @@
-/** クリップボードのテキストを読む（「クリップボードから貼り付け」ボタン。Q13） */
+/** クリップボードのテキストを読む（「貼り付け」ボタン。Q13） */
 export async function readClipboardText(): Promise<string> {
   return navigator.clipboard.readText();
 }

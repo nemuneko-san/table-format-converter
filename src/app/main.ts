@@ -28,12 +28,19 @@ const DRAFT_SAVE_DELAY_MS = 300;
  */
 export const LARGE_INPUT_CHARS = 30000;
 const LARGE_INPUT_DELAY_MS = 250;
-/** 成功メッセージ（コピー・読み込み）を出しておく時間。警告・エラーは消さない */
+/** 成功メッセージ（コピー・読み込み・取り消し）を出しておく時間。警告・エラーは消さない */
 export const FLASH_MS = 4000;
-/** 入力欄と出力欄の高さを揃えるのは、2 つが左右に並んでいる幅のときだけ（styles.css の Q16 の境目と同じ） */
-const SIDE_BY_SIDE_QUERY = "(min-width: 961px)";
 
-type StatusKind = "info" | "success" | "warn" | "error";
+type StatusKind = "info" | "warn" | "error";
+
+/** クリアの直前の状態。「クリアを取り消す」で入力・表モデル・編集履歴・見出しの指定をそのまま戻す */
+type ClearedState = {
+  input: string;
+  outcome: ParseOutcome | null;
+  table: Table | null;
+  history: Table[];
+  headerOverride: boolean | null;
+};
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -79,6 +86,9 @@ function elements() {
     transpose: byId<HTMLButtonElement>("transpose-button"),
     openOptions: byId<HTMLButtonElement>("open-options"),
     status: byId<HTMLDivElement>("status"),
+    inputStatus: byId<HTMLSpanElement>("input-status"),
+    copyStatus: byId<HTMLSpanElement>("copy-status"),
+    previewStatus: byId<HTMLSpanElement>("preview-status"),
     undoClear: byId<HTMLButtonElement>("undo-clear-button"),
     undo: byId<HTMLButtonElement>("undo-button"),
     editState: byId<HTMLSpanElement>("edit-state"),
@@ -106,27 +116,6 @@ function applyChangedDefaults(current: Settings, before: Settings, after: Settin
   return next;
 }
 
-/**
- * 入力欄・出力欄の片方をドラッグで高さ変更したら、左右に並んでいる間はもう片方も同じ高さにする。
- * 区画の高さに合わせて伸びた分では反応しないよう、ドラッグを終えた時点の style.height だけを見る
- */
-function syncWorkareaHeights(a: HTMLTextAreaElement, b: HTMLTextAreaElement): void {
-  const view = a.ownerDocument.defaultView;
-  const follow = (source: HTMLTextAreaElement, target: HTMLTextAreaElement): void => {
-    let before = source.style.height;
-    source.addEventListener("pointerdown", () => {
-      before = source.style.height;
-    });
-    source.addEventListener("pointerup", () => {
-      if (source.style.height === before) return;
-      if (view?.matchMedia && !view.matchMedia(SIDE_BY_SIDE_QUERY).matches) return;
-      target.style.height = source.style.height;
-    });
-  };
-  follow(a, b);
-  follow(b, a);
-}
-
 /** 変換タブ（Q4 専用タブ）を初期化する */
 export async function main(): Promise<void> {
   const el = elements();
@@ -146,37 +135,32 @@ export async function main(): Promise<void> {
   let history: Table[] = [];
   // いま編集中のセル（"行:列"）。同じセルへの連続した入力は 1 手にまとめる
   let editingCell: string | null = null;
-  // 「クリア」で消した入力。次に入力するまで「元に戻す」で復元できる
-  let clearedInput: string | null = null;
+  // 「クリア」の直前の状態。次に入力するまで「クリアを取り消す」で復元できる
+  let cleared: ClearedState | null = null;
   // 次の解析結果を「読み込みました」として知らせるか（貼り付け・クリアの取り消し・候補の選択のとき）
   let announceNextParse = false;
-  // 成功メッセージが消えたあとに戻す、警告・エラーなどの表示
-  let persistent: { message: string; kind: StatusKind; screenReaderOnly: boolean } = {
-    message: "",
-    kind: "info",
-    screenReaderOnly: false,
-  };
-  let flashTimer: ReturnType<typeof setTimeout> | undefined;
-
-  const showStatus = (message: string, kind: StatusKind, screenReaderOnly: boolean): void => {
+  /** 警告・エラーの状態行（区画の間）。自動では消さない */
+  const setStatus = (message: string, kind: StatusKind = "info", screenReaderOnly = false): void => {
     el.status.textContent = message;
     el.status.dataset.kind = kind;
     // 判定失敗の文は候補パネルにも出るので、画面では 1 回だけ見せ、読み上げ用には状態行に残す
     el.status.classList.toggle("sr-only", screenReaderOnly);
   };
 
-  const setStatus = (message: string, kind: StatusKind = "info", screenReaderOnly = false): void => {
-    clearTimeout(flashTimer);
-    persistent = { message, kind, screenReaderOnly };
-    showStatus(message, kind, screenReaderOnly);
+  // 操作した場所の近く（入力・出力・プレビューの区画の見出し行）に出す成功メッセージ。場所は常に確保してある
+  const flashTimers = new Map<HTMLElement, ReturnType<typeof setTimeout>>();
+  const note = (target: HTMLElement, message: string, transient: boolean): void => {
+    clearTimeout(flashTimers.get(target));
+    target.textContent = message;
+    if (!transient) return;
+    flashTimers.set(
+      target,
+      setTimeout(() => {
+        target.textContent = "";
+      }, FLASH_MS),
+    );
   };
-
-  /** 成功メッセージを少しの間だけ出し、消えたら元の表示（警告など）に戻す */
-  const flash = (message: string): void => {
-    clearTimeout(flashTimer);
-    showStatus(message, "success", false);
-    flashTimer = setTimeout(() => showStatus(persistent.message, persistent.kind, persistent.screenReaderOnly), FLASH_MS);
-  };
+  const flash = (target: HTMLElement, message: string): void => note(target, message, true);
 
   /** 表があるか・出力が空か・編集があるかで、押せるボタンと編集中の表示を切り替える */
   const renderControls = (): void => {
@@ -188,7 +172,7 @@ export async function main(): Promise<void> {
     el.clear.disabled = el.input.value === "";
     el.undo.disabled = history.length === 0;
     el.editState.hidden = history.length === 0;
-    el.undoClear.hidden = clearedInput === null;
+    el.undoClear.hidden = cleared === null;
   };
 
   const renderOptions = (): void => {
@@ -276,9 +260,12 @@ export async function main(): Promise<void> {
   }
 
   /** 行数・列数と形式。ヘッダー行も 1 行として数える（プレビューの行数と同じ数え方） */
-  const tableSummary = (t: Table, format: string): string => `${format}・${t.rows.length} 行 × ${t.rows[0]?.length ?? 0} 列`;
+  const tableSummary = (t: Table, format: string): string =>
+    `${format}・入力は ${t.rows.length} 行 × ${t.rows[0]?.length ?? 0} 列`;
 
   const renderParseStatus = (announce = false): void => {
+    // 入力の解釈が変わったら、前の「読み込みました」「クリアしました」は消す
+    if (!announce) note(el.inputStatus, "", false);
     el.candidates.hidden = true;
     el.detected.textContent = "";
     if (!outcome || (!outcome.ok && outcome.reason === "empty")) {
@@ -290,14 +277,9 @@ export async function main(): Promise<void> {
       el.detected.textContent = tableSummary(outcome.table, outcome.auto ? `${label}（自動判定）` : label);
       const rows = outcome.table.rows.length;
       const cols = outcome.table.rows[0]?.length ?? 0;
-      const headerNote = table?.header ? "。1 行目を見出しとして扱います" : "";
-      const loaded = `${rows} 行 × ${cols} 列を読み込みました（${label}${headerNote}）。`;
-      if (outcome.warnings.length > 0) {
-        setStatus(`${announce ? `${loaded} ` : ""}${outcome.warnings.join(" / ")}`, "warn");
-        return;
-      }
-      setStatus("");
-      if (announce) flash(loaded);
+      const loaded = `${rows} 行 × ${cols} 列を読み込みました（${label}）。`;
+      if (announce) flash(el.inputStatus, loaded);
+      setStatus(outcome.warnings.join(" / "), outcome.warnings.length > 0 ? "warn" : "info");
       return;
     }
     // 判定できないときは候補パネルの文が同じことを言うので、状態行は読み上げ用にだけ残す
@@ -355,7 +337,7 @@ export async function main(): Promise<void> {
 
   const onInputChanged = (): void => {
     headerOverride = null;
-    clearedInput = null;
+    cleared = null;
     scheduleDraftSave();
     if (el.input.value.length <= LARGE_INPUT_CHARS) {
       reparse();
@@ -376,7 +358,7 @@ export async function main(): Promise<void> {
     if (el.output.value === "") return;
     try {
       await action();
-      flash(done);
+      flash(el.copyStatus, done);
     } catch {
       setStatus("クリップボードにコピーできませんでした。", "error");
     }
@@ -440,21 +422,33 @@ export async function main(): Promise<void> {
       .catch(() => setStatus("クリップボードを読み取れませんでした。入力欄で Ctrl+V を使ってください。", "error"));
   });
   el.clear.addEventListener("click", () => {
-    const before = el.input.value;
+    const before: ClearedState = { input: el.input.value, outcome, table, history, headerOverride };
     el.input.value = "";
     onInputChanged();
-    if (before !== "") {
-      clearedInput = before;
-      setStatus("入力をクリアしました。");
+    if (before.input !== "") {
+      cleared = before;
+      note(el.inputStatus, "入力をクリアしました。", false);
       renderControls();
     }
     el.input.focus();
   });
+  // 入力から作り直さず、クリアの直前の表モデル・編集履歴・見出しの指定をそのまま戻す（プレビューの編集も残る）
   el.undoClear.addEventListener("click", () => {
-    if (clearedInput === null) return;
-    el.input.value = clearedInput;
-    announceNextParse = true;
-    onInputChanged();
+    if (cleared === null) return;
+    const snapshot = cleared;
+    cleared = null;
+    clearTimeout(parseTimer);
+    el.input.value = snapshot.input;
+    outcome = snapshot.outcome;
+    table = snapshot.table;
+    history = snapshot.history;
+    headerOverride = snapshot.headerOverride;
+    editingCell = null;
+    outputErrorShown = false;
+    renderParseStatus();
+    renderAll();
+    scheduleDraftSave();
+    flash(el.inputStatus, "クリアを取り消しました。");
     el.input.focus();
   });
   el.transpose.addEventListener("click", () => updateTable(transpose, true));
@@ -467,12 +461,11 @@ export async function main(): Promise<void> {
     // 見出しの指定は編集の履歴に含めない（チェックボックスの状態と食い違わないよう、今の指定を保つ）
     table = { ...item, header: table.header };
     renderAll();
-    flash("1 つ前の状態に戻しました。");
+    flash(el.previewStatus, "1 つ前の状態に戻しました。");
   });
   el.openOptions.addEventListener("click", () => void chrome.runtime.openOptionsPage());
 
   el.input.ownerDocument.defaultView?.addEventListener("pagehide", saveDraftNow);
-  syncWorkareaHeights(el.input, el.output);
 
   // 出力系の設定変更は再描画だけにしてプレビュー上の編集を保つ。前処理が変わったときだけ入力から作り直す
   onSettingsChanged((next) => {
