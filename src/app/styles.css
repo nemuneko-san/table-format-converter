@@ -1,5 +1,16 @@
 /* 変換タブ。値は tokens.css のトークンだけを使う（docs/design.md） */
 :root {
+  /* トースト: 元の実装の値（右下 16px・最大幅 320px・余白 10px 14px・影 0 4px 12px 30%・成功 #15803d・失敗 #b91c1c） */
+  --toast-offset: 16px;
+  --toast-max-width: 320px;
+  --toast-pad-block: 10px;
+  --toast-pad-inline: 14px;
+  --toast-icon: 20px;
+  --toast-ink: #ffffff;
+  --toast-success: #15803d;
+  --toast-error: #b91c1c;
+  --toast-icon-bg: rgb(255 255 255 / 0.25);
+  --toast-shadow: 0 4px 12px rgb(0 0 0 / 0.3);
   --panel-width: 360px; /* 詳細設定の面の幅 */
   --workarea-height: 360px;
   --workarea-height-narrow: 240px;
@@ -60,42 +71,9 @@
   }
 }
 
-/* 区画の見出し行に出す、その区画での操作の結果（読み込み・クリア・コピー・取り消し）。
-   場所は常に確保し、文が出ても消えても他の要素は動かない（狭い区画では下のメディアクエリで次の行に回す） */
-.local-status {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: var(--fs-small);
-  line-height: var(--lh-small);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
 /* 作業画面の操作行は、中身が無くても部品 1 つ分の高さを確保する（左右で行の高さを揃えやすくする） */
 .pane > .toolbar {
   min-height: var(--control-height);
-}
-
-/* 区画が狭い（幅 760px 未満）ときは、見出し行の結果の文を次の行に回して切れないようにする。
-   横並び（961px 以上）では区画の幅が (画面幅 - 64px) / 2 なので 1599px まで、上下に積むときは画面幅 807px までが該当する。
-   左右の区画は同じ幅なので、横並びでも両方が同じように折り返し、行の高さは揃ったままになる。
-   コンテナクエリは区画にレイアウトの封じ込めを掛けて subgrid を無効にするため使わない */
-@media (min-width: 961px) and (max-width: 1599px) {
-  .pane .local-status {
-    flex-basis: 100%;
-    order: 1;
-    min-height: var(--lh-small);
-  }
-}
-
-@media (max-width: 807px) {
-  .local-status {
-    flex-basis: 100%;
-    order: 1;
-    min-height: var(--lh-small);
-  }
 }
 
 .mono {
@@ -378,4 +356,43 @@
 .preview th[contenteditable],
 .preview td[contenteditable] {
   border-radius: 0;
+}
+
+/* ---------- トースト通知（table-to-markdown-copier の src/content/toast.ts と同じ見た目・位置。色も元の配色を使う） ---------- */
+.toast {
+  position: fixed;
+  right: var(--toast-offset);
+  bottom: var(--toast-offset);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: min(var(--toast-max-width), calc(100vw - var(--toast-offset) * 2));
+  padding: var(--toast-pad-block) var(--toast-pad-inline);
+  border-radius: var(--radius-card);
+  color: var(--toast-ink);
+  font: var(--fs-control) / 1.4 var(--font-ui);
+  box-shadow: var(--toast-shadow);
+  overflow-wrap: anywhere;
+  /* 表示中も下の操作を邪魔しない（クリックはトーストを素通りする） */
+  pointer-events: none;
+}
+
+.toast.success {
+  background: var(--toast-success);
+}
+
+.toast.error {
+  background: var(--toast-error);
+}
+
+.toast-icon {
+  flex: none;
+  width: var(--toast-icon);
+  height: var(--toast-icon);
+  border-radius: 50%;
+  background: var(--toast-icon-bg);
+  text-align: center;
+  font-weight: var(--fw-bold);
+  line-height: var(--toast-icon);
 }

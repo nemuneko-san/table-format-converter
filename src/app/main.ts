@@ -20,6 +20,7 @@ import {
 import { copyRichHtml, copyText, readClipboardText } from "./clipboard";
 import { anchorPopover } from "./popover";
 import { renderPreview } from "./preview";
+import { showToast } from "./toast";
 
 const DRAFT_SAVE_DELAY_MS = 300;
 /**
@@ -29,8 +30,6 @@ const DRAFT_SAVE_DELAY_MS = 300;
  */
 export const LARGE_INPUT_CHARS = 30000;
 const LARGE_INPUT_DELAY_MS = 250;
-/** 成功メッセージ（コピー・読み込み・取り消し）を出しておく時間。警告・エラーは消さない */
-export const FLASH_MS = 4000;
 
 type StatusKind = "info" | "warn" | "error";
 
@@ -90,9 +89,6 @@ function elements() {
     advancedButton: byId<HTMLButtonElement>("advanced-button"),
     advancedPanel: byId<HTMLDivElement>("advanced-panel"),
     status: byId<HTMLDivElement>("status"),
-    inputStatus: byId<HTMLSpanElement>("input-status"),
-    copyStatus: byId<HTMLSpanElement>("copy-status"),
-    previewStatus: byId<HTMLSpanElement>("preview-status"),
     undoClear: byId<HTMLButtonElement>("undo-clear-button"),
     undo: byId<HTMLButtonElement>("undo-button"),
     editState: byId<HTMLSpanElement>("edit-state"),
@@ -150,32 +146,6 @@ export async function main(): Promise<void> {
     // 判定失敗の文は候補パネルにも出るので、画面では 1 回だけ見せ、読み上げ用には状態行に残す
     el.status.classList.toggle("sr-only", screenReaderOnly);
   };
-
-  // 操作した場所の近く（入力・出力・プレビューの区画の見出し行）に出す成功メッセージ。場所は常に確保してある
-  const flashTimers = new Map<HTMLElement, ReturnType<typeof setTimeout>>();
-  // spoken を渡すと、画面には短い message を、読み上げには spoken を出す（狭い見出し行で文が切れないように）
-  const note = (target: HTMLElement, message: string, transient: boolean, spoken?: string): void => {
-    clearTimeout(flashTimers.get(target));
-    if (spoken === undefined) {
-      target.textContent = message;
-    } else {
-      const visible = document.createElement("span");
-      visible.setAttribute("aria-hidden", "true");
-      visible.textContent = message;
-      const voice = document.createElement("span");
-      voice.className = "sr-only";
-      voice.textContent = spoken;
-      target.replaceChildren(visible, voice);
-    }
-    if (!transient) return;
-    flashTimers.set(
-      target,
-      setTimeout(() => {
-        target.textContent = "";
-      }, FLASH_MS),
-    );
-  };
-  const flash = (target: HTMLElement, message: string, spoken?: string): void => note(target, message, true, spoken);
 
   /** 表があるか・出力が空か・編集があるかで、押せるボタンと編集中の表示を切り替える */
   const renderControls = (): void => {
@@ -279,8 +249,6 @@ export async function main(): Promise<void> {
     `${format}・入力は ${t.rows.length} 行 × ${t.rows[0]?.length ?? 0} 列`;
 
   const renderParseStatus = (announce = false): void => {
-    // 入力の解釈が変わったら、前の「読み込みました」「クリアしました」は消す
-    if (!announce) note(el.inputStatus, "", false);
     el.candidates.hidden = true;
     el.detected.textContent = "";
     if (!outcome || (!outcome.ok && outcome.reason === "empty")) {
@@ -293,7 +261,7 @@ export async function main(): Promise<void> {
       const rows = outcome.table.rows.length;
       const cols = outcome.table.rows[0]?.length ?? 0;
       const loaded = `${rows} 行 × ${cols} 列を読み込みました（${label}）。`;
-      if (announce) flash(el.inputStatus, loaded);
+      if (announce) showToast("success", loaded);
       setStatus(outcome.warnings.join(" / "), outcome.warnings.length > 0 ? "warn" : "info");
       return;
     }
@@ -373,10 +341,11 @@ export async function main(): Promise<void> {
     if (el.output.value === "") return;
     try {
       await action();
-      // コピー 3 種とも画面には同じ短い文を出し、種類の区別は読み上げの文で伝える
-      flash(el.copyStatus, "コピーしました。", done);
+      showToast("success", done);
     } catch {
+      // 失敗はトーストでも知らせ、状態行のエラーは消さずに残す
       setStatus("クリップボードにコピーできませんでした。", "error");
+      showToast("error", "クリップボードにコピーできませんでした。");
     }
   };
 
@@ -435,7 +404,11 @@ export async function main(): Promise<void> {
         announceNextParse = true;
         onInputChanged();
       })
-      .catch(() => setStatus("クリップボードを読み取れませんでした。入力欄で Ctrl+V を使ってください。", "error"));
+      .catch(() => {
+        const message = "クリップボードを読み取れませんでした。入力欄で Ctrl+V を使ってください。";
+        setStatus(message, "error");
+        showToast("error", message);
+      });
   });
   el.clear.addEventListener("click", () => {
     const before: ClearedState = { input: el.input.value, outcome, table, history, headerOverride, inputFormat };
@@ -443,7 +416,7 @@ export async function main(): Promise<void> {
     onInputChanged();
     if (before.input !== "") {
       cleared = before;
-      note(el.inputStatus, "入力をクリアしました。", false);
+      showToast("success", "入力をクリアしました。");
       renderControls();
     }
     el.input.focus();
@@ -467,7 +440,7 @@ export async function main(): Promise<void> {
     renderParseStatus();
     renderAll();
     scheduleDraftSave();
-    flash(el.inputStatus, "クリアを取り消しました。");
+    showToast("success", "クリアを取り消しました。");
     el.input.focus();
   });
   el.transpose.addEventListener("click", () => updateTable(transpose, true));
@@ -480,7 +453,7 @@ export async function main(): Promise<void> {
     // 見出しの指定は編集の履歴に含めない（チェックボックスの状態と食い違わないよう、今の指定を保つ）
     table = { ...item, header: table.header };
     renderAll();
-    flash(el.previewStatus, "1 つ前の状態に戻しました。");
+    showToast("success", "1 つ前の状態に戻しました。");
   });
   el.openOptions.addEventListener("click", () => void chrome.runtime.openOptionsPage());
 

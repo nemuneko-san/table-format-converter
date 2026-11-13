@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FLASH_MS, main as appMain } from "../src/app/main";
+import { main as appMain } from "../src/app/main";
+import { TOAST_DURATION_MS } from "../src/app/toast";
 import { HISTORY_LIMIT, popHistory, pushHistory } from "../src/lib/history";
 import appHtml from "../src/app/index.html?raw";
 import { installChromeMock, loadPageBody } from "./chrome-mock";
@@ -23,8 +24,9 @@ function select(el: HTMLSelectElement, value: string): void {
 
 const output = (): string => byId<HTMLTextAreaElement>("output").value;
 const status = (): HTMLElement => byId("status");
-const inputStatus = (): HTMLElement => byId("input-status");
-const copyStatus = (): HTMLElement => byId("copy-status");
+/** 画面に出ているトースト（1 つだけ） */
+const toasts = (): HTMLElement[] => Array.from(document.querySelectorAll<HTMLElement>(".toast"));
+const toastText = (): string | null | undefined => toasts()[0]?.lastElementChild?.textContent;
 
 function editCell(row: number, col: number, value: string): void {
   const cell = byId("preview").querySelector<HTMLElement>(`[data-row="${row}"][data-col="${col}"]`);
@@ -90,7 +92,7 @@ describe("プレビューの編集を元に戻す", () => {
     expect(undo.disabled).toBe(false);
     undo.click();
     expect(output()).toBe("c,a\n3,9");
-    expect(byId("preview-status").textContent).toBe("1 つ前の状態に戻しました。");
+    expect(toastText()).toBe("1 つ前の状態に戻しました。");
     undo.click();
     expect(output()).toBe("a,c\n9,3");
     undo.click();
@@ -195,14 +197,14 @@ describe("クリアを元に戻す", () => {
     byId<HTMLButtonElement>("clear-button").click();
     expect(byId<HTMLTextAreaElement>("input").value).toBe("");
     expect(output()).toBe("");
-    expect(inputStatus().textContent).toBe("入力をクリアしました。");
+    expect(toastText()).toBe("入力をクリアしました。");
     expect(undoClear.hidden).toBe(false);
     expect(undoClear.textContent).toBe("クリアを取り消す");
     undoClear.click();
     expect(byId<HTMLTextAreaElement>("input").value).toBe("a\tb\n1\t2");
     expect(output()).toBe("a,b\n1,2");
     expect(undoClear.hidden).toBe(true);
-    expect(inputStatus().textContent).toBe("クリアを取り消しました。");
+    expect(toastText()).toBe("クリアを取り消しました。");
   });
 
   it("クリアを取り消すと、プレビューの編集・編集の履歴・見出しの指定までクリア前と同じに戻る", async () => {
@@ -261,13 +263,15 @@ describe("操作結果のメッセージ", () => {
     await appMain();
     byId<HTMLButtonElement>("paste-button").click();
     await vi.waitFor(() => expect(byId<HTMLTextAreaElement>("input").value).toBe(SAMPLE_BOX));
-    expect(inputStatus().textContent).toBe("5 行 × 4 列を読み込みました（罫線文字の表）。");
-    expect(inputStatus().getAttribute("aria-live")).toBe("polite");
+    expect(toastText()).toBe("5 行 × 4 列を読み込みました（罫線文字の表）。");
+    // 成功のトーストは role="status"（読み上げられる）
+    expect(toasts()[0]?.getAttribute("role")).toBe("status");
+    expect(toasts()[0]?.classList.contains("success")).toBe(true);
     // 入力区画の件数は入力の件数と分かる文言で、プレビューの行数（見出し行を含む）と同じ数え方
     expect(byId("detected").textContent).toBe("罫線文字の表（自動判定）・入力は 5 行 × 4 列");
     expect(byId("preview").querySelectorAll("tr").length).toBe(5);
-    vi.advanceTimersByTime(FLASH_MS);
-    expect(inputStatus().textContent).toBe("");
+    vi.advanceTimersByTime(TOAST_DURATION_MS);
+    expect(toasts().length).toBe(0);
   });
 
   it("Ctrl+V の貼り付けでも知らせ、手入力では知らせない", async () => {
@@ -275,10 +279,10 @@ describe("操作結果のメッセージ", () => {
     await appMain();
     const input = byId<HTMLTextAreaElement>("input");
     typeInto(input, "a,b\n1,2");
-    expect(inputStatus().textContent).toBe("");
+    expect(toasts().length).toBe(0);
     input.dispatchEvent(new Event("paste"));
     typeInto(input, "a,b\n1,2\n3,4");
-    expect(inputStatus().textContent).toContain("3 行 × 2 列を読み込みました（CSV");
+    expect(toastText()).toContain("3 行 × 2 列を読み込みました（CSV");
   });
 
   it("コピー・ソースコピー・リッチコピーの成功を区別して知らせる", async () => {
@@ -294,22 +298,17 @@ describe("操作結果のメッセージ", () => {
     );
     await appMain();
     typeInto(byId("input"), "a,b\n1,2");
-    // 画面には 3 種とも同じ短い文、読み上げ（sr-only）には種類の分かる文
-    const shown = (): string | null | undefined => copyStatus().querySelector('[aria-hidden="true"]')?.textContent;
-    const spoken = (): string | null | undefined => copyStatus().querySelector(".sr-only")?.textContent;
     byId<HTMLButtonElement>("copy-button").click();
-    await vi.waitFor(() => expect(spoken()).toBe("コピーしました。"));
-    expect(shown()).toBe("コピーしました。");
-    expect(copyStatus().getAttribute("aria-live")).toBe("polite");
+    await vi.waitFor(() => expect(toastText()).toBe("コピーしました。"));
     select(byId("output-format"), "html");
     byId<HTMLButtonElement>("source-copy-button").click();
-    await vi.waitFor(() => expect(spoken()).toBe("HTML のソースをコピーしました。"));
-    expect(shown()).toBe("コピーしました。");
+    await vi.waitFor(() => expect(toastText()).toBe("HTML のソースをコピーしました。"));
     byId<HTMLButtonElement>("rich-copy-button").click();
-    await vi.waitFor(() => expect(spoken()).toBe("リッチテキスト（表）としてコピーしました。"));
-    expect(shown()).toBe("コピーしました。");
-    vi.advanceTimersByTime(FLASH_MS);
-    expect(copyStatus().textContent).toBe("");
+    await vi.waitFor(() => expect(toastText()).toBe("リッチテキスト（表）としてコピーしました。"));
+    // 続けて出しても重ねず、最新の 1 つだけを出す
+    expect(toasts().length).toBe(1);
+    vi.advanceTimersByTime(TOAST_DURATION_MS);
+    expect(toasts().length).toBe(0);
   });
 
   it("コピーに失敗したらエラーを出し、時間がたっても消さない", async () => {
@@ -319,11 +318,15 @@ describe("操作結果のメッセージ", () => {
     typeInto(byId("input"), "a,b\n1,2");
     byId<HTMLButtonElement>("copy-button").click();
     await vi.waitFor(() => expect(status().dataset.kind).toBe("error"));
-    vi.advanceTimersByTime(FLASH_MS * 2);
+    // 失敗はエラーのトースト（role="alert"）でも知らせる
+    expect(toasts()[0]?.classList.contains("error")).toBe(true);
+    expect(toasts()[0]?.getAttribute("role")).toBe("alert");
+    vi.advanceTimersByTime(TOAST_DURATION_MS * 2);
+    expect(toasts().length).toBe(0);
     expect(status().textContent).toBe("クリップボードにコピーできませんでした。");
   });
 
-  it("警告が出ている間にコピーしても、警告は状態行に残り、成功はコピーボタンの近くに出る", async () => {
+  it("警告が出ている間にコピーしても、警告は状態行に残り（トーストに置き換えない）、成功はトーストで出る", async () => {
     installChromeMock();
     vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText: vi.fn(async () => undefined) } });
     await appMain();
@@ -331,9 +334,10 @@ describe("操作結果のメッセージ", () => {
     expect(status().dataset.kind).toBe("warn");
     const warning = status().textContent;
     byId<HTMLButtonElement>("copy-button").click();
-    await vi.waitFor(() => expect(copyStatus().querySelector(".sr-only")?.textContent).toBe("コピーしました。"));
+    await vi.waitFor(() => expect(toastText()).toBe("コピーしました。"));
     expect(status().textContent).toBe(warning);
-    vi.advanceTimersByTime(FLASH_MS);
+    vi.advanceTimersByTime(TOAST_DURATION_MS);
+    expect(toasts().length).toBe(0);
     expect(status().textContent).toBe(warning);
     expect(status().dataset.kind).toBe("warn");
   });
@@ -455,5 +459,16 @@ describe("再検証の指摘（フェーズ 1）", () => {
     expect(byId("preview").querySelector<HTMLButtonElement>(".col-menu-button")?.disabled).toBe(true);
     typeInto(byId("input"), "a,b\n1,2");
     expect(byId("preview").querySelector<HTMLButtonElement>(".col-menu-button")?.disabled).toBe(false);
+  });
+});
+
+describe("トースト通知への置き換え", () => {
+  beforeEach(() => loadPageBody(appHtml));
+
+  it("区画内の成功メッセージ用の場所は無い", async () => {
+    installChromeMock();
+    await appMain();
+    for (const id of ["input-status", "copy-status", "preview-status"]) expect(document.getElementById(id)).toBeNull();
+    expect(document.querySelector(".local-status")).toBeNull();
   });
 });

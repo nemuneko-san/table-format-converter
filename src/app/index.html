@@ -24,7 +24,6 @@
           <div class="card-head">
             <h2 id="input-title">入力</h2>
             <span id="detected" class="meta"></span>
-            <span id="input-status" class="local-status" role="status" aria-live="polite"></span>
             <button type="button" id="undo-clear-button" class="secondary" hidden>クリアを取り消す</button>
           </div>
           <div class="toolbar">
@@ -55,7 +54,6 @@
         <section class="card pane" aria-labelledby="output-title">
           <div class="card-head">
             <h2 id="output-title">出力</h2>
-            <span id="copy-status" class="local-status" role="status" aria-live="polite"></span>
             <span class="toolbar-end">
               <button type="button" id="copy-button" class="primary">コピー</button>
               <button type="button" id="rich-copy-button" class="primary" hidden>リッチコピー</button>
@@ -144,7 +142,6 @@
         <div class="card-head">
           <h2 id="preview-title">プレビュー</h2>
           <span id="edit-state" class="edit-state" hidden>編集中の内容があります</span>
-          <span id="preview-status" class="local-status" role="status" aria-live="polite"></span>
           <span class="toolbar-end">
             <button type="button" id="undo-button" class="secondary">
               <svg class="button-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
