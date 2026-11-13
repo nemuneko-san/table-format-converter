@@ -12,12 +12,45 @@
   padding: 0 var(--page-pad) var(--page-pad);
 }
 
-/* Q16: 広い幅では左右、狭い幅では上下に並べる（境目 960px）。
-   左右に並ぶ間は 2 区画を同じ高さに伸ばし、作業欄が残りを埋めるので、下端が揃い区画の中に空きができない */
+/* Q16: 広い幅では左右、狭い幅では上下に並べる（境目 960px） */
 .panes {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--gap);
+}
+
+/* 左右に並ぶ間は 2 区画で行を共有する: 見出し行・操作行・補足の行・作業欄（・候補パネル）。
+   行の高さが揃うので 2 つの作業欄の上端が一致し、作業欄の高さを変えても上の行は動かない（ドラッグした欄の下端がカーソルに付いてくる）。
+   subgrid に対応しない Chrome 116 では区画ごとの縦並びのまま表示される */
+@supports (grid-template-rows: subgrid) {
+  @media (min-width: 961px) {
+    .panes {
+      grid-template-rows: repeat(4, auto);
+      row-gap: 0;
+    }
+
+    .pane {
+      display: grid;
+      grid-row: span 4;
+      grid-template-rows: subgrid;
+      /* 列の幅は区画の幅に固定する（長い 1 行の入力で作業欄が区画の外へはみ出さないように） */
+      grid-template-columns: minmax(0, 1fr);
+      align-content: start;
+    }
+
+    /* 相手の区画の行が高くなっても（詳細設定を開いたときなど）、中身は行の上端に置く */
+    .pane > * {
+      align-self: start;
+    }
+
+    .panes:has(.candidates:not([hidden])) {
+      grid-template-rows: repeat(5, auto);
+    }
+
+    .panes:has(.candidates:not([hidden])) .pane {
+      grid-row: span 5;
+    }
+  }
 }
 
 @media (max-width: 960px) {
@@ -26,16 +59,39 @@
   }
 }
 
+/* 区画の見出し行に出す、その区画での操作の結果（読み込み・クリア・コピー・取り消し）。
+   場所は常に確保し、文が出ても消えても他の要素は動かない */
+.local-status {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 区画の補足の 1 行（入力: 判定した形式と件数、出力: 選んでいる設定の意味）。空でも高さを確保する */
+.card-note {
+  min-height: var(--lh-small);
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  overflow-wrap: anywhere;
+}
+
 .mono {
   font-family: var(--font-mono);
   font-size: var(--fs-control);
   line-height: 1.5;
 }
 
-/* 作業欄: 高さはドラッグで変えられる（横並びの間はもう片方も同じ高さにする。main.ts） */
+/* 作業欄: 高さは各欄を独立にドラッグで変えられる。区画に合わせて伸び縮みはしない */
 .workarea {
   display: block;
-  flex: 1 0 auto;
+  flex: none;
+  align-self: start;
   width: 100%;
   height: var(--workarea-height);
   min-height: calc(var(--control-height) * 3);
@@ -142,46 +198,21 @@
   flex-direction: column;
 }
 
-/* ---------- 状態行（区画の間に置く。空のときは場所を取らない） ---------- */
-.feedback {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-}
-
-/* 知らせることが無いときは場所を取らない */
-.feedback:not(:has(.status:not(:empty))):not(:has(button:not([hidden]))) {
-  display: none;
-}
-
-/* 読み上げ用の文だけのときは、読み上げられるよう残したまま並びから外す（区画の間隔を変えない） */
-.feedback:has(.status.sr-only):not(:has(button:not([hidden]))) {
-  position: absolute;
-}
-
+/* ---------- 状態行（警告・エラー。区画の間に置き、自動では消さない） ---------- */
 .status:empty {
   display: none;
 }
 
 /* 空白のない長い文（URL・スタックトレース）でも枠からはみ出さない */
 .status {
-  flex: 1 1 20em;
-  min-width: 0;
   padding: var(--space-2) var(--space-3);
   border: var(--line) solid transparent;
   border-radius: var(--radius-control);
   overflow-wrap: anywhere;
 }
 
-.status[data-kind="info"],
-.status[data-kind="success"] {
-  flex: 0 1 auto;
+.status[data-kind="info"] {
   padding-inline: 0;
-}
-
-.status[data-kind="success"] {
-  font-weight: var(--fw-medium);
 }
 
 .status[data-kind="warn"] {
@@ -278,11 +309,60 @@
   padding-block: calc(var(--cell-pad-block) - var(--space-1));
 }
 
-.col-tools {
-  display: flex;
+/* 列の操作: 列見出しの中の地つきのボタン 1 つと、押すと開く文字のメニュー（popover。Esc・外側のクリックで閉じる） */
+.col-menu {
   flex: none;
-  gap: var(--space-1);
   margin-inline-start: auto;
+}
+
+.col-menu-button {
+  width: var(--icon-button);
+  min-height: var(--icon-button);
+  height: var(--icon-button);
+  padding: 0;
+}
+
+/* 「…」の 3 点は線のままだと小さすぎるので太くして点に見せる */
+.col-menu-button .icon-menu {
+  stroke-width: var(--icon-dot);
+}
+
+.col-menu-list {
+  /* popover の既定の中央配置をやめ、preview.ts がボタンの真下に置く */
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  min-width: 10em;
+  padding: var(--space-1);
+  border: var(--line) solid var(--rule);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+
+.col-menu-list:popover-open {
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-item {
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0 var(--space-3);
+  background: transparent;
+  font-weight: var(--fw-regular);
+}
+
+.menu-item.danger {
+  color: var(--danger-ink);
+}
+
+.menu-item.danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+
+.menu-item:disabled {
+  background: transparent;
 }
 
 /* 編集できることを示す: ホバーで輪郭とテキストカーソル、フォーカスでアクセントの輪郭と地 */

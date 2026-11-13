@@ -14,7 +14,6 @@
   --text: #17201b;
   --muted: #566059; /* 白地 6.5:1・地 5.8:1・副次の地 5.5:1 */
   --disabled-ink: #687069; /* 押せない部品の文字（読める濃さを保つ: 薄地 4.7:1・白地 5.1:1。地を --raised にして有効時と分ける） */
-  --disabled-icon: #b3bbb6; /* 押せない列操作の記号（存在は見え、有効時の --muted と区別できる薄さ） */
   --accent: #1f7a5a; /* 主ボタン・フォーカス・選択状態だけ */
   --accent-hover: #186148;
   --accent-ink: #ffffff;
@@ -67,10 +66,13 @@
   --icon-button: 28px;
   --icon-size: 16px;
   --icon-stroke: 1.5px;
+  --icon-dot: 3px;
   --topbar-height: 48px;
   --mark-size: 20px;
   --check-size: 16px;
   --t-hover: 150ms;
+  /* 影は浮くもの（列の操作のメニュー）にだけ使う */
+  --shadow-float: 0 4px 16px rgb(23 32 27 / 0.12);
 }
 
 /* 狭い幅ではページと区画の余白を詰める */
@@ -283,8 +285,7 @@ button.primary:disabled {
   background: var(--raised);
 }
 
-.button-icon,
-.icon-button svg {
+.button-icon {
   flex: none;
   width: var(--icon-size);
   height: var(--icon-size);
@@ -293,31 +294,6 @@ button.primary:disabled {
   stroke-width: var(--icon-stroke);
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-/* 列操作などのアイコンだけのボタン（静かの種類） */
-.icon-button {
-  width: var(--icon-button);
-  min-height: var(--icon-button);
-  height: var(--icon-button);
-  padding: 0;
-  background: transparent;
-  color: var(--muted);
-}
-
-.icon-button:hover:not(:disabled) {
-  background: var(--secondary);
-  color: var(--text);
-}
-
-.icon-button.danger:hover:not(:disabled) {
-  background: var(--danger-soft);
-  color: var(--danger-ink);
-}
-
-.icon-button:disabled {
-  background: transparent;
-  color: var(--disabled-icon);
 }
 
 /* ---------- 入力部品 ---------- */
