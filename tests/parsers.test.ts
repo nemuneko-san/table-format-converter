@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parseCsv, parseDelimitedRows, parseTsv, detectCsvDelimiter } from "../src/lib/parsers/delimited";
-import { parseHtml } from "../src/lib/parsers/html";
+import { parseHtml, renameStyleAttributes, STYLE_ATTR } from "../src/lib/parsers/html";
 import { parseJson } from "../src/lib/parsers/json";
 import { parseMarkdown, splitPipeRow } from "../src/lib/parsers/markdown";
 import { parseAscii, parseBox } from "../src/lib/parsers/ruled";
@@ -171,6 +171,38 @@ describe("HTML パーサ", () => {
 
   it("table が無ければ例外", () => {
     expect(() => parseHtml("<p>x</p>")).toThrow();
+  });
+
+  it("パースした要素に style 属性を残さない（CSP の style-src 'self' で違反を出さない）", () => {
+    const raw = parseHtml(
+      '<table style="border-collapse:collapse"><tr><th STYLE="text-align:center">a</th><td style=\'text-align: right\'>1</td></tr></table>',
+    );
+    expect(raw.inputAligns).toEqual(["center", "right"]);
+    // DOMParser に渡す文字列の時点で style 属性が無いことを確かめる
+    const spy = vi.spyOn(DOMParser.prototype, "parseFromString");
+    parseHtml('<table><tr><td style="text-align:right">1</td></tr></table>');
+    expect(spy.mock.calls[0][0]).not.toMatch(/\sstyle=/i);
+    spy.mockRestore();
+  });
+
+  it("style 属性の名前の置き換えは、引用符の中の > やタグの外の文字列を変えない", () => {
+    expect(renameStyleAttributes('<td title="a > style=b" style="text-align:right">x style="y" 1 < 2</td>')).toBe(
+      `<td title="a > style=b" ${STYLE_ATTR}="text-align:right">x style="y" 1 < 2</td>`,
+    );
+    expect(renameStyleAttributes("<td data-style=x style=text-align:right/>")).toBe(
+      `<td data-style=x ${STYLE_ATTR}=text-align:right/>`,
+    );
+    expect(renameStyleAttributes('<!-- <td style="a"> --><textarea><b style="c"></textarea><td style="d">')).toBe(
+      `<!-- <td style="a"> --><textarea><b style="c"></textarea><td ${STYLE_ATTR}="d">`,
+    );
+  });
+
+  it("引用符の中の > や「style=」があっても揃えとセルの値を正しく読む", () => {
+    const raw = parseHtml(
+      '<table><tr><td title="x>y style=text-align:center">a</td><td style="text-align:right">1 &gt; style=0</td></tr></table>',
+    );
+    expect(raw.rows).toEqual([["a", "1 > style=0"]]);
+    expect(raw.inputAligns).toEqual(["none", "right"]);
   });
 });
 

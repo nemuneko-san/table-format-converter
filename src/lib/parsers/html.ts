@@ -27,8 +27,116 @@ function collect(node: Node): string {
   return BLOCK_TAGS.has(el.tagName) ? `\u0000${inner}\u0000` : inner;
 }
 
+/** style 属性の退避先。拡張ページの CSP（style-src 'self'）は style 属性を持つ要素を作るたびに違反を報告するため、パース前に名前を変える */
+export const STYLE_ATTR = "data-tfc-style";
+
+/** 中身をタグとして読まない要素（HTML の raw text / escapable raw text 要素） */
+const RAW_TEXT_TAGS = new Set(["script", "style", "textarea", "title", "xmp", "iframe", "noembed", "noframes", "noscript"]);
+
+const SPACE = /[\t\n\f\r ]/;
+
+/** 位置 i から属性名・値を読み飛ばし、タグ末尾の `>` の次の位置を返す。style 属性の名前は STYLE_ATTR に置き換えて out に書く */
+function scanTag(text: string, start: number, out: string[]): number {
+  let i = start;
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === ">") {
+      out.push(">");
+      return i + 1;
+    }
+    if (SPACE.test(ch) || ch === "/") {
+      out.push(ch);
+      i++;
+      continue;
+    }
+    // 属性名（先頭の `=` も名前の一部。HTML の仕様どおり）
+    let end = i + 1;
+    while (end < text.length && !SPACE.test(text[end]) && !"/>=".includes(text[end])) end++;
+    const name = text.slice(i, end);
+    out.push(name.toLowerCase() === "style" ? STYLE_ATTR : name);
+    i = scanAttrValue(text, end, out);
+  }
+  return i;
+}
+
+/** 属性名の直後から `= 値` を読み飛ばして out に書き、次の位置を返す */
+function scanAttrValue(text: string, start: number, out: string[]): number {
+  let i = start;
+  while (i < text.length && SPACE.test(text[i])) i++;
+  if (text[i] !== "=") {
+    out.push(text.slice(start, i));
+    return i;
+  }
+  i++;
+  while (i < text.length && SPACE.test(text[i])) i++;
+  const quote = text[i];
+  let end: number;
+  if (quote === '"' || quote === "'") {
+    const close = text.indexOf(quote, i + 1);
+    end = close === -1 ? text.length : close + 1;
+  } else {
+    end = i;
+    while (end < text.length && !SPACE.test(text[end]) && text[end] !== ">") end++;
+  }
+  out.push(text.slice(start, end));
+  return end;
+}
+
+/** タグ名の終わりの位置 */
+function tagNameEnd(text: string, start: number): number {
+  let i = start;
+  while (i < text.length && !SPACE.test(text[i]) && text[i] !== "/" && text[i] !== ">") i++;
+  return i;
+}
+
+/** raw text 要素の中身を飛ばし、閉じタグ `</name` の位置を返す（無ければ末尾） */
+function rawTextEnd(text: string, start: number, name: string): number {
+  const close = text.toLowerCase().indexOf(`</${name}`, start);
+  return close === -1 ? text.length : close;
+}
+
+/**
+ * タグの style 属性の名前を STYLE_ATTR に変える。値・それ以外の文字はそのまま残す。
+ * 引用符の中の `>`、コメント、script / textarea などの中身にある「style=」は書き換えない
+ */
+export function renameStyleAttributes(text: string): string {
+  const out: string[] = [];
+  let i = 0;
+  while (i < text.length) {
+    const lt = text.indexOf("<", i);
+    if (lt === -1) {
+      out.push(text.slice(i));
+      break;
+    }
+    out.push(text.slice(i, lt));
+    if (text.startsWith("<!--", lt)) {
+      const close = text.indexOf("-->", lt + 4);
+      const end = close === -1 ? text.length : close + 3;
+      out.push(text.slice(lt, end));
+      i = end;
+      continue;
+    }
+    const isEnd = text[lt + 1] === "/";
+    const nameStart = isEnd ? lt + 2 : lt + 1;
+    if (!/[A-Za-z]/.test(text[nameStart] ?? "")) {
+      out.push("<");
+      i = lt + 1;
+      continue;
+    }
+    const nameEnd = tagNameEnd(text, nameStart);
+    out.push(text.slice(lt, nameEnd));
+    i = scanTag(text, nameEnd, out);
+    const name = text.slice(nameStart, nameEnd).toLowerCase();
+    if (isEnd || !RAW_TEXT_TAGS.has(name)) continue;
+    const end = rawTextEnd(text, i, name);
+    out.push(text.slice(i, end));
+    i = end;
+  }
+  return out.join("");
+}
+
 function readAlign(cell: Element): Align {
-  const style = (cell.getAttribute("style") ?? "").match(/text-align\s*:\s*(left|center|right)/i);
+  const style = (cell.getAttribute(STYLE_ATTR) ?? "").match(/text-align\s*:\s*(left|center|right)/i);
   const value = (style?.[1] ?? cell.getAttribute("align") ?? "").toLowerCase();
   if (value === "left" || value === "center" || value === "right") return value;
   return "none";
@@ -89,7 +197,7 @@ function hasHeaderRow(table: Element, first: Element | undefined): boolean | nul
 
 /** HTML の最初の table を解析する */
 export function parseHtml(text: string): RawTable {
-  const doc = new DOMParser().parseFromString(text, "text/html");
+  const doc = new DOMParser().parseFromString(renameStyleAttributes(text), "text/html");
   const table = doc.querySelector("table");
   if (!table) throw new Error("table 要素が見つかりません");
   const rows = tableRows(table);

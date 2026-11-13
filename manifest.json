@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Table Format Converter",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "Markdown / TSV / CSV / 罫線表 / HTML / JSON の表を相互に変換します",
   "minimum_chrome_version": "116",
   "icons": {

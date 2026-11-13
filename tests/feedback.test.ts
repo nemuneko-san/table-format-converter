@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { main as appMain } from "../src/app/main";
 import { TOAST_DURATION_MS } from "../src/app/toast";
 import { HISTORY_LIMIT, popHistory, pushHistory } from "../src/lib/history";
@@ -43,6 +43,25 @@ function columnButton(label: string): HTMLButtonElement {
   const b = byId("preview").querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
   if (!b) throw new Error(`button ${label} not found`);
   return b;
+}
+
+/** document.execCommand("copy") を copy イベントを出すだけの代役にし、clipboardData に書かれた値を返す */
+function stubCopyCommand(): Record<string, string> {
+  const data: Record<string, string> = {};
+  const original = document.execCommand;
+  document.execCommand = ((command: string) => {
+    if (command !== "copy") return false;
+    const event = new Event("copy", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", {
+      value: { setData: (type: string, value: string) => void (data[type] = value) },
+    });
+    document.dispatchEvent(event);
+    return true;
+  }) as typeof document.execCommand;
+  onTestFinished(() => {
+    document.execCommand = original;
+  });
+  return data;
 }
 
 afterEach(() => {
@@ -288,14 +307,8 @@ describe("操作結果のメッセージ", () => {
   it("コピー・ソースコピー・リッチコピーの成功を区別して知らせる", async () => {
     installChromeMock();
     const writeText = vi.fn(async () => undefined);
-    const write = vi.fn(async () => undefined);
-    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText, write } });
-    vi.stubGlobal(
-      "ClipboardItem",
-      class {
-        constructor(readonly items: Record<string, Blob>) {}
-      },
-    );
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    const copied = stubCopyCommand();
     await appMain();
     typeInto(byId("input"), "a,b\n1,2");
     byId<HTMLButtonElement>("copy-button").click();
@@ -305,10 +318,29 @@ describe("操作結果のメッセージ", () => {
     await vi.waitFor(() => expect(toastText()).toBe("HTML のソースをコピーしました。"));
     byId<HTMLButtonElement>("rich-copy-button").click();
     await vi.waitFor(() => expect(toastText()).toBe("リッチテキスト（表）としてコピーしました。"));
+    // text/html は inline style つきのまま、text/plain には同じソースを書く（Q36・Q37）
+    expect(copied["text/html"]).toBe(output());
+    expect(copied["text/html"]).toContain('style="');
+    expect(copied["text/plain"]).toBe(output());
     // 続けて出しても重ねず、最新の 1 つだけを出す
     expect(toasts().length).toBe(1);
     vi.advanceTimersByTime(TOAST_DURATION_MS);
     expect(toasts().length).toBe(0);
+  });
+
+  it("リッチコピーで copy イベントが起きなければ失敗として知らせる", async () => {
+    installChromeMock();
+    const original = document.execCommand;
+    document.execCommand = (() => false) as typeof document.execCommand;
+    onTestFinished(() => {
+      document.execCommand = original;
+    });
+    await appMain();
+    typeInto(byId("input"), "a,b\n1,2");
+    select(byId("output-format"), "html");
+    byId<HTMLButtonElement>("rich-copy-button").click();
+    await vi.waitFor(() => expect(status().dataset.kind).toBe("error"));
+    expect(toasts()[0]?.classList.contains("error")).toBe(true);
   });
 
   it("コピーに失敗したらエラーを出し、時間がたっても消さない", async () => {
