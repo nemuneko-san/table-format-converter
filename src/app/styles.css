@@ -1,173 +1,281 @@
+/* 変換タブ。値は tokens.css のトークンだけを使う（docs/design.md） */
 :root {
-  color-scheme: light dark;
-  --border: #c8ccd2;
-  --muted: #6b7280;
-  --accent: #2563eb;
-  --warn: #b45309;
-  --error: #b91c1c;
-  font-family: system-ui, "Segoe UI", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
-  font-size: 14px;
+  --workarea-height: 360px;
+  --workarea-height-narrow: 240px;
 }
 
-body {
-  margin: 0;
-  padding: 12px 16px 32px;
-}
-
-.app-header {
+.sheet {
   display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.app-header h1 {
-  font-size: 18px;
-  margin: 0 auto 0 0;
+  flex-direction: column;
+  gap: var(--space-5);
 }
 
 h2 {
-  font-size: 15px;
-  margin: 0;
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: var(--fw-bold);
 }
 
-.link-button {
-  background: none;
-  border: none;
-  color: var(--accent);
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-/* Q16: 広い幅では左右、狭い幅では上下に並べる */
+/* Q16: 広い幅では左右、狭い幅では上下に並べる（境目 960px） */
 .panes {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 12px;
-}
-
-@media (max-width: 960px) {
-  .panes {
-    grid-template-columns: 1fr;
-  }
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-5);
 }
 
 .pane {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-3);
   min-width: 0;
 }
 
-.pane-head,
-.format-options,
-.button-row {
+/* 左右に並ぶ間は、見出し行・補助行・作業欄の高さを 2 列で揃えて、2 つの作業欄の上端を一致させる。
+   subgrid に対応しない Chrome 116 では上の flex 配置のまま表示される */
+@supports (grid-template-rows: subgrid) {
+  @media (min-width: 961px) {
+    .panes {
+      grid-template-rows: repeat(3, auto);
+      row-gap: 0;
+    }
+
+    .pane {
+      display: grid;
+      grid-row: span 3;
+      grid-template-rows: subgrid;
+      row-gap: var(--space-3);
+    }
+
+    /* 候補パネルが出ている間だけ 4 行目を作る（空の行の gap で下の余白が増えないように） */
+    .panes:has(.candidates:not([hidden])) {
+      grid-template-rows: repeat(4, auto);
+    }
+
+    .panes:has(.candidates:not([hidden])) .pane {
+      grid-row: span 4;
+    }
+  }
+}
+
+@media (max-width: 960px) {
+  .panes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.pane-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2) var(--space-3);
 }
 
-.spacer {
-  flex: 1;
+.pane-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-inline-start: auto;
 }
 
-.muted {
-  color: var(--muted);
-  font-size: 12px;
+.pane-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  min-height: var(--control-height);
+}
+
+.option-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
 .mono {
-  font-family: "BIZ UDGothic", "BIZ UDゴシック", "MS Gothic", "ＭＳ ゴシック", "Noto Sans Mono CJK JP", "Osaka-Mono",
-    monospace;
-  font-size: 14px;
-  line-height: 1.4;
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  line-height: 1.5;
 }
 
 textarea {
-  box-sizing: border-box;
+  display: block;
   width: 100%;
-  height: 360px;
+  height: var(--workarea-height);
+  min-height: var(--control-height);
+  margin: 0;
   resize: vertical;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  padding: var(--space-3);
+  border: var(--line) solid var(--control);
+  border-radius: var(--radius-card);
+  background: var(--surface);
   white-space: pre;
   overflow: auto;
 }
 
-button {
-  cursor: pointer;
+textarea::placeholder {
+  color: var(--muted);
 }
 
-button.primary {
-  background: var(--accent);
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  color: #fff;
-  padding: 4px 12px;
+textarea:focus-visible {
+  outline-offset: 0;
+  border-color: var(--accent);
 }
 
-[hidden] {
-  display: none !important;
+textarea[readonly] {
+  background: var(--raised);
 }
 
+@media (max-width: 960px) {
+  textarea {
+    height: var(--workarea-height-narrow);
+  }
+
+  /* 上下に並ぶ間は高さを揃える相手がいないので、空の補助行は詰める */
+  .pane-meta:not(:has(> :not(:empty))) {
+    display: none;
+  }
+}
+
+/* 判定できなかったときの候補 */
 .candidates {
-  border: 1px solid var(--warn);
-  border-radius: 6px;
-  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: var(--line) solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--raised);
 }
 
-.candidates p {
-  margin: 0 0 6px;
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* 状態行: 空のときは場所を取らない。警告・エラーは色だけでなく縁と文面で示す */
+.status:empty {
+  display: none;
 }
 
 .status {
-  min-height: 1.4em;
-  margin: 8px 0;
+  padding: var(--space-2) var(--space-3);
+  border: var(--line) solid transparent;
+  border-radius: var(--radius-card);
+  color: var(--muted);
+}
+
+.status[data-kind="info"] {
+  padding-block: 0;
+  padding-inline: 0;
 }
 
 .status[data-kind="warn"] {
-  color: var(--warn);
+  background: var(--warn-bg);
+  border-color: var(--warn-border);
+  color: var(--warn-ink);
 }
 
 .status[data-kind="error"] {
-  color: var(--error);
+  background: var(--error-bg);
+  border-color: var(--error-border);
+  color: var(--error-ink);
 }
 
+/* ---------- プレビュー ---------- */
 .preview-section {
-  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-5);
+  border-top: var(--line) solid var(--rule);
+}
+
+.preview-hint {
+  flex: 1 1 16em;
 }
 
 .preview {
-  margin-top: 8px;
   overflow: auto;
+}
+
+/* 表が無いとき・大きすぎて省略したときも、枠を保って 1 文を示す */
+.preview:empty::before,
+.preview > .muted {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  border: var(--line) dashed var(--control);
+  border-radius: var(--radius-card);
+  color: var(--muted);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.preview:empty::before {
+  content: "入力欄に表を貼り付けると、ここに表として表示されます。";
 }
 
 .preview table {
   border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
 }
 
 .preview th,
 .preview td {
-  border: 1px solid var(--border);
-  padding: 4px 8px;
+  min-width: 4em;
+  padding: var(--space-2) var(--space-3);
+  border: var(--line) solid var(--border);
+  text-align: start;
   white-space: pre-wrap;
   vertical-align: top;
-  min-width: 2em;
 }
 
+.preview th {
+  font-weight: var(--fw-bold);
+}
+
+/* シグネチャ: 見出し行の下に、罫線表のヘッダー区切りと同じ位置の 2px の罫 */
 .preview .header-row th {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-bottom: var(--line-strong) solid var(--accent);
+}
+
+.preview [contenteditable]:hover {
+  background: var(--raised);
+}
+
+.preview [contenteditable]:focus {
+  outline: var(--line-strong) solid var(--accent);
+  outline-offset: calc(var(--line-strong) * -1);
+  background: var(--accent-soft);
 }
 
 .preview .col-controls th {
-  border: none;
-  padding: 2px;
+  padding: 0 0 var(--space-1);
+  border: 0;
+  font-weight: var(--fw-regular);
   white-space: nowrap;
 }
 
 .preview .col-controls button {
-  font-size: 11px;
-  padding: 0 4px;
+  min-width: var(--control-height-small);
+  min-height: var(--control-height-small);
+  padding: 0 var(--space-1);
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+
+.preview .col-controls button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--rule);
+  color: var(--text);
+}
+
+.preview .col-controls button:disabled {
+  border-color: transparent;
+  background: transparent;
+  color: var(--control);
 }

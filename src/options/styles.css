@@ -1,33 +1,103 @@
+/* オプションページ。値は ../app/tokens.css のトークンだけを使う（docs/design.md） */
 :root {
-  color-scheme: light dark;
-  font-family: system-ui, "Segoe UI", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
-  font-size: 14px;
+  --settings-width: 720px;
 }
 
-body {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 16px 24px 32px;
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: var(--settings-width);
+  margin-inline: auto;
+}
+
+.settings-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
 h1 {
-  font-size: 18px;
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: var(--fw-bold);
 }
 
-fieldset {
+.settings-head .muted {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 0 0 12px;
-  border: 1px solid #c8ccd2;
-  border-radius: 6px;
+  gap: var(--space-4);
+}
+
+/* 区画: 見出し（legend）を縁取りのパネルの内側の 1 行目に置く */
+fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-1);
+  border: var(--line) solid var(--border);
+  border-radius: var(--radius-card);
 }
 
 legend {
-  font-weight: 600;
+  float: left;
+  width: 100%;
+  padding: 0 0 var(--space-1);
+  font-weight: var(--fw-bold);
 }
 
-.muted {
-  color: #6b7280;
-  font-size: 12px;
+/* legend を float にしたので、次の行は回り込ませずにその下から始める */
+legend + * {
+  clear: left;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  min-height: calc(var(--control-height) + var(--space-3));
+  padding-block: var(--space-1);
+  border-top: var(--line) solid var(--rule);
+}
+
+legend + .row {
+  border-top: 0;
+}
+
+/* 2 行に折り返しても、チェックボックスを 1 行目の高さに揃える */
+.row.check {
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  min-height: 0;
+  padding-block: var(--space-3);
+}
+
+.row.check input {
+  margin-block-start: calc((var(--lh-body) - var(--check-size)) / 2);
+}
+
+.row select {
+  flex: none;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* 狭い幅では、セレクトを伴う行はラベルの下に部品を置く */
+@media (max-width: 480px) {
+  .row:not(.check) {
+    flex-direction: column;
+    align-items: flex-start;
+    padding-block: var(--space-2);
+  }
 }

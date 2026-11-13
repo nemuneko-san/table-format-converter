@@ -1,0 +1,267 @@
+/* 変換タブとオプションページで共有するトークンと土台（docs/design.md）。各ページの CSS はここの値だけを使う */
+:root {
+  color-scheme: light;
+
+  /* カラー */
+  --ground: #f3f6f4; /* 枠: グリーンバー用紙の緑みのグレー */
+  --surface: #ffffff; /* 作業シート */
+  --raised: #f6f8f7; /* ホバー・内側のパネル */
+  --border: #dfe5e1; /* シート・パネルの縁 */
+  --rule: #edf1ee; /* パネル内の区切り */
+  --control: #869089; /* 入力欄・ボタンの縁（WCAG 1.4.11: 白地 3.3:1・薄地 3.1:1・枠地 3.0:1） */
+  --text: #17201b;
+  --muted: #566059; /* 白地 6.5:1・枠地 6.0:1 */
+  --accent: #1f7a5a; /* グリーンバー緑: 主ボタン・フォーカス・見出しの下罫 */
+  --accent-hover: #186148;
+  --accent-ink: #ffffff;
+  --accent-soft: #e4f1eb;
+  --warn-bg: #fffbeb;
+  --warn-border: #fde68a;
+  --warn-ink: #92400e;
+  --error-bg: #fff1ef;
+  --error-border: #f5c2bb;
+  --error-ink: #9b1c1f;
+
+  /* 文字 */
+  --font-ui: system-ui, "Segoe UI", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
+  /* 罫線表・Markdown の桁揃えを確かめられるよう、全角:半角が 2:1 の和文等幅を優先する */
+  --font-mono: "BIZ UDGothic", "BIZ UDゴシック", "MS Gothic", "ＭＳ ゴシック", "Noto Sans Mono CJK JP", "Osaka-Mono",
+    monospace;
+  --fs-small: 12px;
+  --fs-body: 14px;
+  --fs-section: 16px;
+  --lh-small: 16px;
+  --lh-body: 20px;
+  --lh-section: 24px;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-bold: 600;
+
+  /* 余白（4px 基準） */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* 形 */
+  --radius-sheet: 16px;
+  --radius-card: 8px;
+  --radius-control: 6px;
+  --radius-chip: 4px;
+  --line: 1px;
+  --line-strong: 2px;
+  --control-height: 32px;
+  --control-height-small: 24px;
+  --mark-size: 20px;
+  --check-size: 16px;
+  --topbar-height: 48px;
+  --sheet-inset: 8px;
+  --sheet-pad: var(--space-5);
+  --t-hover: 150ms;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--ground);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ground);
+  color: var(--text);
+  font: var(--fw-regular) var(--fs-body) / var(--lh-body) var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+:focus-visible {
+  outline: var(--line-strong) solid var(--accent);
+  outline-offset: var(--line-strong);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+
+/* ---------- 枠: 上部バーとシート ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--topbar-height);
+  padding-inline: var(--space-4) var(--space-2);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-inline-end: auto;
+  white-space: nowrap;
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: var(--fw-bold);
+}
+
+.brand-mark {
+  display: block;
+  flex: none;
+  width: var(--mark-size);
+  height: var(--mark-size);
+  border-radius: var(--radius-chip);
+}
+
+.sheet {
+  flex: 1;
+  margin: 0 var(--sheet-inset) var(--sheet-inset);
+  padding: var(--sheet-pad);
+  background: var(--surface);
+  border: var(--line) solid var(--border);
+  border-radius: var(--radius-sheet);
+}
+
+/* 狭い幅では枠を消し、シートを画面いっぱいにする */
+@media (max-width: 600px) {
+  :root {
+    --sheet-pad: var(--space-4);
+  }
+
+  .sheet {
+    margin: 0;
+    border-inline: 0;
+    border-bottom: 0;
+    border-radius: 0;
+  }
+}
+
+/* ---------- 操作部品 ---------- */
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: var(--line) solid var(--control);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-body);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--t-hover) ease,
+    border-color var(--t-hover) ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--raised);
+  border-color: var(--muted);
+}
+
+button:disabled {
+  color: var(--muted);
+  border-color: var(--border);
+  background: var(--raised);
+  cursor: default;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+button.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+button.ghost:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--rule);
+  color: var(--text);
+}
+
+select {
+  min-height: var(--control-height);
+  max-width: 100%;
+  padding: 0 var(--space-2);
+  border: var(--line) solid var(--control);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+select:hover {
+  border-color: var(--muted);
+}
+
+input[type="checkbox"] {
+  width: var(--check-size);
+  height: var(--check-size);
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex: none;
+}
+
+input[type="checkbox"]:disabled {
+  cursor: default;
+}
+
+/* ラベル付きの部品: 文字と部品を 1 行に揃える */
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+}
+
+.field:has(input:disabled) {
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+}

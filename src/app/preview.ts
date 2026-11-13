@@ -28,7 +28,7 @@ function columnControls(cols: number, handlers: PreviewHandlers): HTMLTableRowEl
     th.append(
       button("←", `${c + 1} 列目を左へ移動`, () => handlers.onMoveColumn(c, -1), c === 0),
       button("→", `${c + 1} 列目を右へ移動`, () => handlers.onMoveColumn(c, 1), c === cols - 1),
-      button("✕", `${c + 1} 列目を削除`, () => handlers.onDeleteColumn(c), cols <= 1),
+      button("×", `${c + 1} 列目を削除`, () => handlers.onDeleteColumn(c), cols <= 1),
     );
     tr.append(th);
   }
