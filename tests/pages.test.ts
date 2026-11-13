@@ -117,10 +117,10 @@ describe("変換タブの統合動作", () => {
     cell.textContent = "9";
     cell.dispatchEvent(new Event("input"));
     expect(byId<HTMLTextAreaElement>("output").value).toBe("a,b,c\n9,2,3");
-    const deleteB = byId("preview").querySelector<HTMLButtonElement>('button[aria-label="2 列目を削除"]');
+    const deleteB = byId("preview").querySelector<HTMLButtonElement>('button[aria-label="列を削除（2 列目）"]');
     deleteB?.click();
     expect(byId<HTMLTextAreaElement>("output").value).toBe("a,c\n9,3");
-    const right = byId("preview").querySelector<HTMLButtonElement>('button[aria-label="1 列目を右へ移動"]');
+    const right = byId("preview").querySelector<HTMLButtonElement>('button[aria-label="右へ移動（1 列目）"]');
     right?.click();
     expect(byId<HTMLTextAreaElement>("output").value).toBe("c,a\n3,9");
     byId<HTMLButtonElement>("transpose-button").click();
@@ -291,7 +291,7 @@ describe("B5〜B7・B13 の UI 修正", () => {
     await appMain();
     select(byId("input-format"), "csv");
     typeInto(byId("input"), "a\n1");
-    const del = byId("preview").querySelector<HTMLButtonElement>('button[aria-label="1 列目を削除"]');
+    const del = byId("preview").querySelector<HTMLButtonElement>('button[aria-label="列を削除（1 列目）"]');
     expect(del?.disabled).toBe(true);
   });
 

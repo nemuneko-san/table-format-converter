@@ -13,27 +13,29 @@
         <img class="brand-mark" src="/icons/icon48.png" alt="" width="20" height="20" />
         <span class="brand-name">Table Format Converter</span>
       </h1>
-      <button type="button" id="open-options" class="ghost">設定（既定値）</button>
+      <button type="button" id="open-options" class="quiet">設定（既定値）</button>
     </header>
 
-    <div class="sheet">
+    <div class="page">
       <main class="panes">
-        <section class="pane" aria-labelledby="input-title">
-          <div class="pane-head">
+        <section class="card pane" aria-labelledby="input-title">
+          <div class="card-head">
             <h2 id="input-title">入力</h2>
+            <span id="detected" class="meta"></span>
+          </div>
+          <div class="toolbar">
             <label class="field">
               形式
               <select id="input-format"></select>
             </label>
-            <span id="detected" class="muted"></span>
-            <span class="pane-actions">
-              <button type="button" id="paste-button">クリップボードから貼り付け</button>
-              <button type="button" id="clear-button">クリア</button>
+            <span class="toolbar-end">
+              <button type="button" id="paste-button" class="secondary">クリップボードから貼り付け</button>
+              <button type="button" id="clear-button" class="destructive">クリア</button>
             </span>
           </div>
           <textarea
             id="input"
-            class="mono input-area"
+            class="mono workarea"
             spellcheck="false"
             aria-labelledby="input-title"
             placeholder="Markdown / TSV / CSV / 罫線表 / HTML / JSON の表を貼り付けてください（Ctrl+V）"
@@ -44,45 +46,31 @@
           </div>
         </section>
 
-        <section class="pane" aria-labelledby="output-title">
-          <div class="pane-head">
+        <section class="card pane" aria-labelledby="output-title">
+          <div class="card-head">
             <h2 id="output-title">出力</h2>
+            <span class="toolbar-end">
+              <button type="button" id="copy-button" class="primary">コピー</button>
+              <button type="button" id="rich-copy-button" class="primary" hidden>リッチコピー</button>
+              <button type="button" id="source-copy-button" class="secondary" hidden>ソースコピー</button>
+            </span>
+          </div>
+          <div class="toolbar">
             <label class="field">
               形式
               <select id="output-format"></select>
             </label>
-            <span class="pane-actions">
-              <button type="button" id="copy-button" class="primary">コピー</button>
-              <button type="button" id="rich-copy-button" class="primary" hidden>リッチコピー</button>
-              <button type="button" id="source-copy-button" hidden>ソースコピー</button>
-            </span>
-          </div>
-          <div class="pane-meta">
-            <span class="option-group">
-              <label class="field">
-                <input type="checkbox" id="header-toggle" />
-                1 行目をヘッダーにする
-              </label>
-              <span id="header-mode" class="muted"></span>
-            </span>
-            <label class="field" data-formats="markdown">
+            <label
+              class="field"
+              data-formats="markdown"
+              title="列の幅を空白で揃え、テキストのままでも表として読めるようにします。Markdown として表示した結果は変わりません"
+            >
               <input type="checkbox" id="opt-markdown-pad" />
               桁を揃える
             </label>
             <label class="field" data-formats="box">
               線種
               <select id="opt-box-style"></select>
-            </label>
-            <label class="field" data-formats="box ascii">
-              <input type="checkbox" id="opt-row-separators" />
-              行の間に罫線
-            </label>
-            <label class="field" data-formats="markdown box ascii">
-              曖昧幅の文字
-              <select id="opt-ambiguous">
-                <option value="1">幅 1</option>
-                <option value="2">幅 2</option>
-              </select>
             </label>
             <label class="field" data-formats="csv">
               区切り文字
@@ -92,7 +80,7 @@
                 <option value="|">パイプ |</option>
               </select>
             </label>
-            <label class="field" data-formats="html">
+            <label class="field" data-formats="html" title="枠線と余白あり: 貼り付け先でも罫線が付くよう、セルに inline style を付けます">
               スタイル
               <select id="opt-html-style"></select>
             </label>
@@ -100,22 +88,74 @@
               構造
               <select id="opt-json-structure"></select>
             </label>
-            <label class="field" data-formats="json">
-              <input type="checkbox" id="opt-json-numbers" />
-              数値を number にする
-            </label>
+            <details class="advanced" data-formats="markdown box ascii json">
+              <summary>詳細設定</summary>
+              <div class="advanced-body">
+                <div class="advanced-item" data-formats="box ascii">
+                  <label class="field">
+                    <input type="checkbox" id="opt-row-separators" aria-describedby="hint-row-separators" />
+                    行の間に罫線
+                  </label>
+                  <p id="hint-row-separators" class="hint">オンで全ての行の間に区切り線を入れます。オフなら見出しの下だけです。</p>
+                </div>
+                <div class="advanced-item" data-formats="markdown box ascii">
+                  <label class="field">
+                    曖昧幅の文字
+                    <select id="opt-ambiguous" aria-describedby="hint-ambiguous">
+                      <option value="1">幅 1（半角）</option>
+                      <option value="2">幅 2（全角）</option>
+                    </select>
+                  </label>
+                  <p id="hint-ambiguous" class="hint">
+                    「— × ○ ※ →」や罫線文字を何文字分として桁を揃えるかです。貼り付け先で縦線がずれるときに切り替えます。
+                  </p>
+                </div>
+                <div class="advanced-item" data-formats="json">
+                  <label class="field">
+                    <input type="checkbox" id="opt-json-numbers" aria-describedby="hint-json-numbers" />
+                    数値を number にする
+                  </label>
+                  <p id="hint-json-numbers" class="hint">整数・小数に見えるセルを、引用符の付かない数値として出力します。</p>
+                </div>
+              </div>
+            </details>
           </div>
-          <textarea id="output" class="mono" spellcheck="false" readonly aria-labelledby="output-title"></textarea>
+          <textarea id="output" class="mono workarea" spellcheck="false" readonly aria-labelledby="output-title"></textarea>
         </section>
       </main>
 
-      <div id="status" class="status" role="status" aria-live="polite"></div>
+      <div class="feedback">
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+        <button type="button" id="undo-clear-button" class="secondary" aria-label="元に戻す: クリアした入力" hidden>
+          元に戻す
+        </button>
+      </div>
 
-      <section class="preview-section" aria-labelledby="preview-title">
-        <div class="pane-head">
+      <section class="card preview-section" aria-labelledby="preview-title">
+        <div class="card-head">
           <h2 id="preview-title">プレビュー</h2>
-          <button type="button" id="transpose-button">行列を入れ替え</button>
-          <span class="muted preview-hint">セルをクリックすると編集できます。列見出しのボタンで列の移動・削除ができます。</span>
+          <span id="edit-state" class="edit-state" hidden>編集中の内容があります</span>
+          <span class="toolbar-end">
+            <button type="button" id="undo-button" class="secondary" aria-label="元に戻す: プレビューの編集">
+              <svg class="button-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M5.5 3.5 2.5 6.5l3 3M2.5 6.5h7a4 4 0 0 1 0 8H7" />
+              </svg>
+              元に戻す
+            </button>
+            <button type="button" id="transpose-button" class="secondary">行列を入れ替え</button>
+          </span>
+        </div>
+        <div class="toolbar">
+          <span class="option-group">
+            <label class="field">
+              <input type="checkbox" id="header-toggle" />
+              1 行目をヘッダーにする
+            </label>
+            <span id="header-mode" class="meta"></span>
+          </span>
+          <p class="hint preview-hint">
+            セルをクリックすると編集できます。編集は出力に反映され、入力欄は書き換わりません（入力欄を変えると編集は破棄されます）。
+          </p>
         </div>
         <div id="preview" class="preview"></div>
       </section>

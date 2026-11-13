@@ -15,11 +15,11 @@
       </p>
     </header>
 
-    <main class="sheet">
-      <div class="settings">
+    <main class="page">
+      <div class="card settings">
         <div class="settings-head">
-          <h1>Table Format Converter の設定</h1>
-          <p class="muted">ここで変えた値が変換タブの既定値になります。変更は自動で保存されます。</p>
+          <h1 class="section-title">Table Format Converter の設定</h1>
+          <p class="hint">ここで変えた値が変換タブの既定値になります。変更は自動で保存されます。</p>
         </div>
 
         <form id="settings-form">
@@ -30,18 +30,28 @@
 
           <fieldset>
             <legend>文字幅</legend>
-            <label class="row">
-              曖昧幅の文字（— × ○ ※ → 罫線文字 など）
-              <select id="ambiguousWide">
-                <option value="false">幅 1</option>
-                <option value="true">幅 2</option>
-              </select>
-            </label>
+            <div class="item">
+              <label class="row">
+                曖昧幅の文字（— × ○ ※ → 罫線文字 など）
+                <select id="ambiguousWide" aria-describedby="hint-ambiguous">
+                  <option value="false">幅 1（半角）</option>
+                  <option value="true">幅 2（全角）</option>
+                </select>
+              </label>
+              <p id="hint-ambiguous" class="hint">
+                これらの文字を何文字分として桁を揃えるかです。罫線表や Markdown を貼り付けた先で縦線がずれるときは、もう一方に切り替えます。
+              </p>
+            </div>
           </fieldset>
 
           <fieldset>
             <legend>Markdown</legend>
-            <label class="row check"><input type="checkbox" id="markdownPad" /> 桁を揃えて整形する</label>
+            <div class="item">
+              <label class="row check"><input type="checkbox" id="markdownPad" aria-describedby="hint-pad" /> 桁を揃えて整形する</label>
+              <p id="hint-pad" class="hint">
+                列の幅を空白で揃え、テキストのままでも表として読めるようにします。Markdown として表示した結果は変わりません。
+              </p>
+            </div>
           </fieldset>
 
           <fieldset>
@@ -64,13 +74,21 @@
 
           <fieldset>
             <legend>HTML</legend>
-            <label class="row">スタイル <select id="htmlStyle"></select></label>
+            <div class="item">
+              <label class="row">スタイル <select id="htmlStyle" aria-describedby="hint-html"></select></label>
+              <p id="hint-html" class="hint">
+                「枠線と余白あり」は、貼り付け先でも罫線が付くよう、セルに inline style を付けます。「スタイルなし」はタグだけです。
+              </p>
+            </div>
           </fieldset>
 
           <fieldset>
             <legend>JSON</legend>
             <label class="row">構造 <select id="jsonStructure"></select></label>
-            <label class="row check"><input type="checkbox" id="jsonNumbers" /> 整数・小数のセルを number にする</label>
+            <div class="item">
+              <label class="row check"><input type="checkbox" id="jsonNumbers" aria-describedby="hint-json" /> 整数・小数のセルを number にする</label>
+              <p id="hint-json" class="hint">整数・小数に見えるセルを、引用符の付かない数値として出力します。</p>
+            </div>
           </fieldset>
 
           <fieldset>
@@ -83,8 +101,8 @@
         </form>
 
         <div class="settings-actions">
-          <button type="button" id="reset-button">既定値に戻す</button>
-          <p id="persist-message" class="muted" role="status"></p>
+          <button type="button" id="reset-button" class="secondary">既定値に戻す</button>
+          <p id="persist-message" class="hint" role="status"></p>
         </div>
       </div>
     </main>
