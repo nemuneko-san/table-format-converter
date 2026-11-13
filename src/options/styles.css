@@ -3,9 +3,11 @@
   --settings-width: 720px;
 }
 
+.page {
+  padding: 0 var(--page-pad) var(--page-pad);
+}
+
 .settings {
-  display: flex;
-  flex-direction: column;
   gap: var(--space-5);
   max-width: var(--settings-width);
   margin-inline: auto;
@@ -15,17 +17,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-}
-
-h1 {
-  font-size: var(--fs-section);
-  line-height: var(--lh-section);
-  font-weight: var(--fw-bold);
-}
-
-.settings-head .muted {
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
 }
 
 form {
@@ -42,7 +33,7 @@ fieldset {
 }
 
 fieldset + fieldset {
-  border-top: var(--line) solid var(--border);
+  border-top: var(--line) solid var(--rule);
 }
 
 fieldset:first-child {
@@ -52,7 +43,9 @@ fieldset:first-child {
 legend {
   float: left;
   width: 100%;
-  padding: 0 0 var(--space-1);
+  padding: 0 0 var(--space-2);
+  font-size: var(--fs-control);
+  line-height: var(--lh-control);
   font-weight: var(--fw-bold);
 }
 
@@ -66,7 +59,7 @@ legend + * {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2) var(--space-4);
-  min-height: calc(var(--control-height) + var(--space-3));
+  min-height: calc(var(--control-height) + var(--space-2));
   padding-block: var(--space-1);
 }
 
@@ -85,6 +78,17 @@ legend + * {
 
 .row select {
   flex: none;
+}
+
+/* 項目の下の補足文 */
+.item {
+  display: flex;
+  flex-direction: column;
+  padding-block-end: var(--space-1);
+}
+
+.item .row.check + .hint {
+  padding-inline-start: calc(var(--check-size) + var(--space-2));
 }
 
 .settings-actions {

@@ -3,20 +3,24 @@
   color-scheme: light;
 
   /* カラー */
-  --ground: #f3f6f4; /* 枠: グリーンバー用紙の緑みのグレー */
-  --surface: #ffffff; /* 作業シート */
-  --raised: #f6f8f7; /* 内側のパネル・セルのホバー */
-  --hover: #e6ece8; /* ボタンのホバー（白地から 1 段濃く） */
-  --border: #dfe5e1; /* シート・パネルの縁 */
-  --rule: #edf1ee; /* パネル内の区切り */
-  --control: #869089; /* 入力欄・ボタンの縁（WCAG 1.4.11: 白地 3.3:1・薄地 3.1:1・枠地 3.0:1） */
+  --ground: #eef2ef; /* ページの地: グリーンバー用紙の緑みのグレー */
+  --surface: #ffffff; /* 区画の面・作業欄 */
+  --raised: #f4f7f5; /* プレビューの見出し行・詳細設定・候補パネル */
+  --secondary: #e6ece8; /* 副次ボタンの地 */
+  --secondary-hover: #d9e1dc;
+  --row-hover: #f7f9f8;
+  --rule: #e6ebe7; /* 行・区画の区切り（線はこれと --control の 2 種だけ） */
+  --control: #869089; /* 入力欄・セレクト・チェックの縁（WCAG 1.4.11: 白地 3.3:1） */
   --text: #17201b;
-  --muted: #566059; /* 白地 6.5:1・枠地 6.0:1 */
-  --disabled-ink: #b9c2bc; /* 押せない記号ボタン: 存在は見えるが有効時（--muted）と区別できる薄さ */
-  --accent: #1f7a5a; /* グリーンバー緑: 主ボタン・フォーカス・見出しの下罫 */
+  --muted: #566059; /* 白地 6.5:1・地 5.8:1・副次の地 5.5:1 */
+  --disabled-ink: #687069; /* 押せない部品の文字（読める濃さを保つ: 薄地 4.7:1・白地 5.1:1。地を --raised にして有効時と分ける） */
+  --disabled-icon: #b3bbb6; /* 押せない列操作の記号（存在は見え、有効時の --muted と区別できる薄さ） */
+  --accent: #1f7a5a; /* 主ボタン・フォーカス・選択状態だけ */
   --accent-hover: #186148;
   --accent-ink: #ffffff;
-  --accent-soft: #e4f1eb;
+  --accent-soft: #e4f1eb; /* 編集中のセル */
+  --danger-ink: #a3262a; /* 破壊的操作の文字（白地 7.3:1・副次の地 6.1:1） */
+  --danger-soft: #fdeceb; /* 破壊的操作のホバーの地 */
   --warn-bg: #fffbeb;
   --warn-border: #fde68a;
   --warn-ink: #92400e;
@@ -24,17 +28,21 @@
   --error-border: #f5c2bb;
   --error-ink: #9b1c1f;
 
-  /* 文字 */
+  /* 文字（5 段のサイズ・3 段の太さ。docs/design.md の 4 節） */
   --font-ui: system-ui, "Segoe UI", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
   /* 罫線表・Markdown の桁揃えを確かめられるよう、全角:半角が 2:1 の和文等幅を優先する */
   --font-mono: "BIZ UDGothic", "BIZ UDゴシック", "MS Gothic", "ＭＳ ゴシック", "Noto Sans Mono CJK JP", "Osaka-Mono",
     monospace;
-  --fs-small: 12px;
-  --fs-body: 14px;
-  --fs-section: 16px;
-  --lh-small: 16px;
-  --lh-body: 20px;
-  --lh-section: 24px;
+  --fs-small: 13px;
+  --lh-small: 18px;
+  --fs-control: 14px;
+  --lh-control: 20px;
+  --fs-body: 15px;
+  --lh-body: 22px;
+  --fs-brand: 16px;
+  --lh-brand: 24px;
+  --fs-section: 18px;
+  --lh-section: 26px;
   --fw-regular: 400;
   --fw-medium: 500;
   --fw-bold: 600;
@@ -46,24 +54,31 @@
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
+  --page-pad: var(--space-5);
+  --gap: var(--space-4);
+  --card-pad: var(--space-5);
 
-  /* 形 */
-  --radius-sheet: 16px;
+  /* 形・寸法 */
   --radius-card: 8px;
   --radius-control: 6px;
-  --radius-chip: 4px;
   --line: 1px;
   --line-strong: 2px;
-  --control-height: 32px;
-  --control-height-small: 24px;
+  --control-height: 36px;
+  --icon-button: 28px;
+  --icon-size: 16px;
+  --icon-stroke: 1.5px;
+  --topbar-height: 48px;
   --mark-size: 20px;
   --check-size: 16px;
-  --topbar-height: 48px;
-  --sheet-inset: 8px;
-  --sheet-pad: var(--space-5);
-  /* 上部バーの左右の余白 = シートの差し込み + 縁 + 内側余白（製品名・設定ボタンをシート内の中身と同じ端に揃える） */
-  --topbar-pad: calc(var(--sheet-inset) + var(--line) + var(--sheet-pad));
   --t-hover: 150ms;
+}
+
+/* 狭い幅ではページと区画の余白を詰める */
+@media (max-width: 600px) {
+  :root {
+    --page-pad: var(--space-3);
+    --card-pad: var(--space-4);
+  }
 }
 
 *,
@@ -79,8 +94,6 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
   background: var(--ground);
   color: var(--text);
   font: var(--fw-regular) var(--fs-body) / var(--lh-body) var(--font-ui);
@@ -105,24 +118,39 @@ textarea {
   display: none !important;
 }
 
+/* 画面には出さず、読み上げにだけ残す */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
 :focus-visible {
   outline: var(--line-strong) solid var(--accent);
   outline-offset: var(--line-strong);
 }
 
-.muted {
+.meta,
+.hint {
   color: var(--muted);
   font-size: var(--fs-small);
   line-height: var(--lh-small);
 }
 
-/* ---------- 枠: 上部バーとシート ---------- */
+/* ---------- 上部バー ---------- */
+/* 左右の余白はページの余白と同じ値にして、製品名・設定をその下の区画の端に揃える */
 .topbar {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   min-height: var(--topbar-height);
-  padding-inline: var(--topbar-pad);
+  padding-inline: var(--page-pad);
 }
 
 .brand {
@@ -132,8 +160,8 @@ textarea {
   min-width: 0;
   margin-inline-end: auto;
   white-space: nowrap;
-  font-size: var(--fs-section);
-  line-height: var(--lh-section);
+  font-size: var(--fs-brand);
+  line-height: var(--lh-brand);
   font-weight: var(--fw-bold);
 }
 
@@ -149,88 +177,150 @@ textarea {
   flex: none;
   width: var(--mark-size);
   height: var(--mark-size);
-  border-radius: var(--radius-chip);
 }
 
-.sheet {
-  flex: 1;
-  margin: 0 var(--sheet-inset) var(--sheet-inset);
-  padding: var(--sheet-pad);
+/* ---------- 区画（淡い地の上の白い面。縁は付けない） ---------- */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--card-pad);
   background: var(--surface);
-  border: var(--line) solid var(--border);
-  border-radius: var(--radius-sheet);
+  border-radius: var(--radius-card);
 }
 
-/* 狭い幅では枠を消し、シートを画面いっぱいにする */
-@media (max-width: 600px) {
-  :root {
-    --sheet-pad: var(--space-4);
-    --topbar-pad: var(--sheet-pad);
-  }
-
-  .sheet {
-    margin: 0;
-    border-inline: 0;
-    border-bottom: 0;
-    border-radius: 0;
-  }
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-height: var(--control-height);
 }
 
-/* ---------- 操作部品 ---------- */
+.card-head h2,
+.section-title {
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: var(--fw-bold);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.toolbar-end {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+
+/* ---------- ボタン: 主要・副次・破壊的・静かの 4 種（docs/design.md の 6 節） ---------- */
 button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
   min-height: var(--control-height);
-  padding: 0 var(--space-3);
-  border: var(--line) solid var(--control);
+  padding: 0 var(--space-4);
+  border: 0;
   border-radius: var(--radius-control);
-  background: var(--surface);
+  background: var(--secondary);
+  color: var(--text);
+  font-size: var(--fs-control);
+  line-height: var(--lh-control);
   font-weight: var(--fw-medium);
-  line-height: var(--lh-body);
   white-space: nowrap;
   cursor: pointer;
   transition:
     background-color var(--t-hover) ease,
-    border-color var(--t-hover) ease;
+    color var(--t-hover) ease;
 }
 
 button:hover:not(:disabled) {
-  background: var(--hover);
-  border-color: var(--muted);
-}
-
-button:disabled {
-  color: var(--muted);
-  border-color: var(--border);
-  background: var(--raised);
-  cursor: default;
+  background: var(--secondary-hover);
 }
 
 button.primary {
   background: var(--accent);
-  border-color: var(--accent);
   color: var(--accent-ink);
 }
 
 button.primary:hover:not(:disabled) {
   background: var(--accent-hover);
-  border-color: var(--accent-hover);
 }
 
-button.ghost {
-  border-color: transparent;
+/* 破壊的: 赤は常に塗らず、文字色で示し、ホバーで淡い赤の地にする */
+button.destructive {
+  color: var(--danger-ink);
+}
+
+button.destructive:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+
+button.quiet {
   background: transparent;
   color: var(--muted);
 }
 
-button.ghost:hover:not(:disabled) {
-  border-color: transparent;
-  background: var(--hover);
+button.quiet:hover:not(:disabled) {
+  background: var(--secondary);
   color: var(--text);
 }
 
+button:disabled {
+  background: var(--raised);
+  color: var(--disabled-ink);
+  cursor: default;
+}
+
+button.primary:disabled {
+  background: var(--raised);
+}
+
+.button-icon,
+.icon-button svg {
+  flex: none;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--icon-stroke);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 列操作などのアイコンだけのボタン（静かの種類） */
+.icon-button {
+  width: var(--icon-button);
+  min-height: var(--icon-button);
+  height: var(--icon-button);
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--secondary);
+  color: var(--text);
+}
+
+.icon-button.danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+}
+
+.icon-button:disabled {
+  background: transparent;
+  color: var(--disabled-icon);
+}
+
+/* ---------- 入力部品 ---------- */
 select {
   min-height: var(--control-height);
   max-width: 100%;
@@ -238,11 +328,9 @@ select {
   border: var(--line) solid var(--control);
   border-radius: var(--radius-control);
   background: var(--surface);
+  font-size: var(--fs-control);
+  line-height: var(--lh-control);
   cursor: pointer;
-}
-
-select:hover {
-  border-color: var(--muted);
 }
 
 input[type="checkbox"] {
@@ -264,10 +352,12 @@ input[type="checkbox"]:disabled {
   align-items: center;
   gap: var(--space-2);
   min-height: var(--control-height);
+  font-size: var(--fs-control);
+  line-height: var(--lh-control);
 }
 
 .field:has(input:disabled) {
-  color: var(--muted);
+  color: var(--disabled-ink);
 }
 
 @media (prefers-reduced-motion: reduce) {
