@@ -11,7 +11,7 @@
     <header class="topbar">
       <h1 class="brand">
         <img class="brand-mark" src="/icons/icon48.png" alt="" width="20" height="20" />
-        Table Format Converter
+        <span class="brand-name">Table Format Converter</span>
       </h1>
       <button type="button" id="open-options" class="ghost">設定（既定値）</button>
     </header>
@@ -25,17 +25,15 @@
               形式
               <select id="input-format"></select>
             </label>
+            <span id="detected" class="muted"></span>
             <span class="pane-actions">
               <button type="button" id="paste-button">クリップボードから貼り付け</button>
               <button type="button" id="clear-button">クリア</button>
             </span>
           </div>
-          <div class="pane-meta">
-            <span id="detected" class="muted"></span>
-          </div>
           <textarea
             id="input"
-            class="mono"
+            class="mono input-area"
             spellcheck="false"
             aria-labelledby="input-title"
             placeholder="Markdown / TSV / CSV / 罫線表 / HTML / JSON の表を貼り付けてください（Ctrl+V）"

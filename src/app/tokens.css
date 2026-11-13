@@ -5,12 +5,14 @@
   /* カラー */
   --ground: #f3f6f4; /* 枠: グリーンバー用紙の緑みのグレー */
   --surface: #ffffff; /* 作業シート */
-  --raised: #f6f8f7; /* ホバー・内側のパネル */
+  --raised: #f6f8f7; /* 内側のパネル・セルのホバー */
+  --hover: #e6ece8; /* ボタンのホバー（白地から 1 段濃く） */
   --border: #dfe5e1; /* シート・パネルの縁 */
   --rule: #edf1ee; /* パネル内の区切り */
   --control: #869089; /* 入力欄・ボタンの縁（WCAG 1.4.11: 白地 3.3:1・薄地 3.1:1・枠地 3.0:1） */
   --text: #17201b;
   --muted: #566059; /* 白地 6.5:1・枠地 6.0:1 */
+  --disabled-ink: #b9c2bc; /* 押せない記号ボタン: 存在は見えるが有効時（--muted）と区別できる薄さ */
   --accent: #1f7a5a; /* グリーンバー緑: 主ボタン・フォーカス・見出しの下罫 */
   --accent-hover: #186148;
   --accent-ink: #ffffff;
@@ -59,6 +61,8 @@
   --topbar-height: 48px;
   --sheet-inset: 8px;
   --sheet-pad: var(--space-5);
+  /* 上部バーの左右の余白 = シートの差し込み + 縁 + 内側余白（製品名・設定ボタンをシート内の中身と同じ端に揃える） */
+  --topbar-pad: calc(var(--sheet-inset) + var(--line) + var(--sheet-pad));
   --t-hover: 150ms;
 }
 
@@ -118,7 +122,7 @@ textarea {
   align-items: center;
   gap: var(--space-3);
   min-height: var(--topbar-height);
-  padding-inline: var(--space-4) var(--space-2);
+  padding-inline: var(--topbar-pad);
 }
 
 .brand {
@@ -131,6 +135,13 @@ textarea {
   font-size: var(--fs-section);
   line-height: var(--lh-section);
   font-weight: var(--fw-bold);
+}
+
+/* 狭い幅では製品名を省略記号で切り、設定ボタンと重ならないようにする */
+.brand-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .brand-mark {
@@ -154,6 +165,7 @@ textarea {
 @media (max-width: 600px) {
   :root {
     --sheet-pad: var(--space-4);
+    --topbar-pad: var(--sheet-pad);
   }
 
   .sheet {
@@ -185,7 +197,7 @@ button {
 }
 
 button:hover:not(:disabled) {
-  background: var(--raised);
+  background: var(--hover);
   border-color: var(--muted);
 }
 
@@ -215,7 +227,7 @@ button.ghost {
 
 button.ghost:hover:not(:disabled) {
   border-color: transparent;
-  background: var(--rule);
+  background: var(--hover);
   color: var(--text);
 }
 

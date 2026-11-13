@@ -30,8 +30,9 @@ h2 {
   min-width: 0;
 }
 
-/* 左右に並ぶ間は、見出し行・補助行・作業欄の高さを 2 列で揃えて、2 つの作業欄の上端を一致させる。
-   subgrid に対応しない Chrome 116 では上の flex 配置のまま表示される */
+/* 左右に並ぶ間は 2 列で行を共有する: 1 行目 = 見出し行、2 行目 = 出力オプション、3 行目 = 作業欄、4 行目 = 候補パネル。
+   入力欄は 2〜3 行目にまたがって伸びるので、出力オプションが何行に折り返しても入力側に空きができず、
+   2 つの作業欄の下端が揃う。subgrid に対応しない Chrome 116 では上の flex 配置のまま表示される */
 @supports (grid-template-rows: subgrid) {
   @media (min-width: 961px) {
     .panes {
@@ -54,6 +55,12 @@ h2 {
     .panes:has(.candidates:not([hidden])) .pane {
       grid-row: span 4;
     }
+
+    .input-area {
+      grid-row: 2 / span 2;
+      height: auto;
+      min-height: var(--workarea-height);
+    }
   }
 }
 
@@ -63,9 +70,11 @@ h2 {
   }
 }
 
+/* 行を共有する相手が折り返して背が伸びても、見出しは行の上端に揃える */
 .pane-head {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
   align-items: center;
   gap: var(--space-2) var(--space-3);
 }
@@ -117,28 +126,25 @@ textarea::placeholder {
   color: var(--muted);
 }
 
+/* フォーカスは 2px の線 1 本: 輪郭を縁の上に重ねる */
 textarea:focus-visible {
-  outline-offset: 0;
-  border-color: var(--accent);
+  outline-offset: calc(var(--line) * -1);
 }
 
+/* 出力欄は白地のまま、読み取り専用であることを入力欄より弱い縁で示す */
 textarea[readonly] {
-  background: var(--raised);
+  border-color: var(--border);
 }
 
 @media (max-width: 960px) {
   textarea {
     height: var(--workarea-height-narrow);
   }
-
-  /* 上下に並ぶ間は高さを揃える相手がいないので、空の補助行は詰める */
-  .pane-meta:not(:has(> :not(:empty))) {
-    display: none;
-  }
 }
 
 /* 判定できなかったときの候補 */
 .candidates {
+  overflow-wrap: anywhere;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -159,7 +165,9 @@ textarea[readonly] {
   display: none;
 }
 
+/* 空白のない長い文（URL・スタックトレース）でも枠からはみ出さない */
 .status {
+  overflow-wrap: anywhere;
   padding: var(--space-2) var(--space-3);
   border: var(--line) solid transparent;
   border-radius: var(--radius-card);
@@ -204,6 +212,7 @@ textarea[readonly] {
 .preview:empty::before,
 .preview > .muted {
   display: block;
+  overflow-wrap: anywhere;
   padding: var(--space-3) var(--space-4);
   border: var(--line) dashed var(--control);
   border-radius: var(--radius-card);
@@ -227,7 +236,8 @@ textarea[readonly] {
   padding: var(--space-2) var(--space-3);
   border: var(--line) solid var(--border);
   text-align: start;
-  white-space: pre-wrap;
+  /* セル内の改行と連続空白は表示し、幅による折り返しはしない（はみ出す分は .preview の横スクロール） */
+  white-space: pre;
   vertical-align: top;
 }
 
@@ -250,8 +260,9 @@ textarea[readonly] {
   background: var(--accent-soft);
 }
 
+/* 列操作はセルと同じ左右の余白にして、見出し文字と左端を揃える */
 .preview .col-controls th {
-  padding: 0 0 var(--space-1);
+  padding: 0 var(--space-3) var(--space-1);
   border: 0;
   font-weight: var(--fw-regular);
   white-space: nowrap;
@@ -270,12 +281,12 @@ textarea[readonly] {
 
 .preview .col-controls button:hover:not(:disabled) {
   border-color: transparent;
-  background: var(--rule);
+  background: var(--hover);
   color: var(--text);
 }
 
 .preview .col-controls button:disabled {
   border-color: transparent;
   background: transparent;
-  color: var(--control);
+  color: var(--disabled-ink);
 }
