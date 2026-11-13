@@ -294,14 +294,20 @@ describe("操作結果のメッセージ", () => {
     );
     await appMain();
     typeInto(byId("input"), "a,b\n1,2");
+    // 画面には 3 種とも同じ短い文、読み上げ（sr-only）には種類の分かる文
+    const shown = (): string | null | undefined => copyStatus().querySelector('[aria-hidden="true"]')?.textContent;
+    const spoken = (): string | null | undefined => copyStatus().querySelector(".sr-only")?.textContent;
     byId<HTMLButtonElement>("copy-button").click();
-    await vi.waitFor(() => expect(copyStatus().textContent).toBe("コピーしました。"));
+    await vi.waitFor(() => expect(spoken()).toBe("コピーしました。"));
+    expect(shown()).toBe("コピーしました。");
     expect(copyStatus().getAttribute("aria-live")).toBe("polite");
     select(byId("output-format"), "html");
     byId<HTMLButtonElement>("source-copy-button").click();
-    await vi.waitFor(() => expect(copyStatus().textContent).toBe("HTML のソースをコピーしました。"));
+    await vi.waitFor(() => expect(spoken()).toBe("HTML のソースをコピーしました。"));
+    expect(shown()).toBe("コピーしました。");
     byId<HTMLButtonElement>("rich-copy-button").click();
-    await vi.waitFor(() => expect(copyStatus().textContent).toBe("リッチテキスト（表）としてコピーしました。"));
+    await vi.waitFor(() => expect(spoken()).toBe("リッチテキスト（表）としてコピーしました。"));
+    expect(shown()).toBe("コピーしました。");
     vi.advanceTimersByTime(FLASH_MS);
     expect(copyStatus().textContent).toBe("");
   });
@@ -325,7 +331,7 @@ describe("操作結果のメッセージ", () => {
     expect(status().dataset.kind).toBe("warn");
     const warning = status().textContent;
     byId<HTMLButtonElement>("copy-button").click();
-    await vi.waitFor(() => expect(copyStatus().textContent).toBe("コピーしました。"));
+    await vi.waitFor(() => expect(copyStatus().querySelector(".sr-only")?.textContent).toBe("コピーしました。"));
     expect(status().textContent).toBe(warning);
     vi.advanceTimersByTime(FLASH_MS);
     expect(status().textContent).toBe(warning);
@@ -380,5 +386,74 @@ describe("作業画面の設定の補足", () => {
     expect(byId("opt-html-style").getAttribute("aria-describedby")).toBe("hint-html-style");
     select(byId("output-format"), "csv");
     expect(pad.hidden && html.hidden).toBe(true);
+  });
+});
+
+describe("再検証の指摘（フェーズ 1）", () => {
+  beforeEach(() => {
+    loadPageBody(appHtml);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  });
+
+  /** happy-dom は popover を開けないので、開いている状態を差し替えて閉じる処理を確かめる */
+  function fakeOpen(panel: HTMLElement): ReturnType<typeof vi.fn> {
+    const hide = vi.fn();
+    const original = panel.matches.bind(panel);
+    panel.matches = (selector: string) => selector === ":popover-open" || original(selector);
+    Object.assign(panel, { hidePopover: hide });
+    return hide;
+  }
+
+  it("ウィンドウの幅を変えると、開いている列の操作メニューと詳細設定の面を閉じる", async () => {
+    installChromeMock();
+    await appMain();
+    typeInto(byId("input"), "a,b\n1,2");
+    const menuHide = fakeOpen(byId("col-menu-0"));
+    const advancedHide = fakeOpen(byId("advanced-panel"));
+    window.dispatchEvent(new Event("resize"));
+    expect(menuHide).toHaveBeenCalled();
+    expect(advancedHide).toHaveBeenCalled();
+  });
+
+  it("詳細設定は popover の面で、開いたまま設定を変えると出力がすぐ変わる", async () => {
+    installChromeMock();
+    await appMain();
+    select(byId("output-format"), "box");
+    typeInto(byId("input"), "a,b\n1,2\n3,4");
+    const button = byId("advanced-button");
+    const panel = byId("advanced-panel");
+    expect(button.getAttribute("popovertarget")).toBe("advanced-panel");
+    expect(panel.getAttribute("popover")).toBe("auto");
+    expect(panel.contains(byId("opt-row-separators"))).toBe(true);
+    const before = output();
+    const rows = byId<HTMLInputElement>("opt-row-separators");
+    rows.checked = !rows.checked;
+    rows.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(output()).not.toBe(before);
+    expect(document.querySelector("details.advanced")).toBeNull();
+  });
+
+  it("クリア → 入力形式を変える → クリアを取り消す で、入力形式もクリア直前に戻る", async () => {
+    installChromeMock();
+    await appMain();
+    select(byId("output-format"), "csv");
+    typeInto(byId("input"), "a\tb\n1\t2");
+    expect(byId<HTMLSelectElement>("input-format").value).toBe("auto");
+    byId<HTMLButtonElement>("clear-button").click();
+    select(byId("input-format"), "csv");
+    byId<HTMLButtonElement>("undo-clear-button").click();
+    expect(byId<HTMLSelectElement>("input-format").value).toBe("auto");
+    expect(output()).toBe("a,b\n1,2");
+    expect(byId("detected").textContent).toContain("TSV（自動判定）");
+  });
+
+  it("列が 1 つだけの表では「列の操作」ボタン自体を押せない", async () => {
+    installChromeMock();
+    await appMain();
+    select(byId("input-format"), "csv");
+    typeInto(byId("input"), "a\n1");
+    expect(byId("preview").querySelector<HTMLButtonElement>(".col-menu-button")?.disabled).toBe(true);
+    typeInto(byId("input"), "a,b\n1,2");
+    expect(byId("preview").querySelector<HTMLButtonElement>(".col-menu-button")?.disabled).toBe(false);
   });
 });

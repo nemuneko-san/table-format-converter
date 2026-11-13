@@ -1,5 +1,6 @@
 /* 変換タブ。値は tokens.css のトークンだけを使う（docs/design.md） */
 :root {
+  --panel-width: 360px; /* 詳細設定の面の幅 */
   --workarea-height: 360px;
   --workarea-height-narrow: 240px;
   --cell-pad-block: 11px; /* 15px/22px の本文で行の高さ 44px にする */
@@ -60,7 +61,7 @@
 }
 
 /* 区画の見出し行に出す、その区画での操作の結果（読み込み・クリア・コピー・取り消し）。
-   場所は常に確保し、文が出ても消えても他の要素は動かない */
+   場所は常に確保し、文が出ても消えても他の要素は動かない（狭い区画では下のメディアクエリで次の行に回す） */
 .local-status {
   flex: 1 1 0;
   min-width: 0;
@@ -72,13 +73,29 @@
   text-overflow: ellipsis;
 }
 
-/* 区画の補足の 1 行（入力: 判定した形式と件数、出力: 選んでいる設定の意味）。空でも高さを確保する */
-.card-note {
-  min-height: var(--lh-small);
-  color: var(--muted);
-  font-size: var(--fs-small);
-  line-height: var(--lh-small);
-  overflow-wrap: anywhere;
+/* 作業画面の操作行は、中身が無くても部品 1 つ分の高さを確保する（左右で行の高さを揃えやすくする） */
+.pane > .toolbar {
+  min-height: var(--control-height);
+}
+
+/* 区画が狭い（幅 760px 未満）ときは、見出し行の結果の文を次の行に回して切れないようにする。
+   横並び（961px 以上）では区画の幅が (画面幅 - 64px) / 2 なので 1599px まで、上下に積むときは画面幅 807px までが該当する。
+   左右の区画は同じ幅なので、横並びでも両方が同じように折り返し、行の高さは揃ったままになる。
+   コンテナクエリは区画にレイアウトの封じ込めを掛けて subgrid を無効にするため使わない */
+@media (min-width: 961px) and (max-width: 1599px) {
+  .pane .local-status {
+    flex-basis: 100%;
+    order: 1;
+    min-height: var(--lh-small);
+  }
+}
+
+@media (max-width: 807px) {
+  .local-status {
+    flex-basis: 100%;
+    order: 1;
+    min-height: var(--lh-small);
+  }
 }
 
 .mono {
@@ -137,31 +154,8 @@
   gap: var(--space-2);
 }
 
-/* ---------- 詳細設定（既定で閉じる。開くと操作行の中で下に広がる） ---------- */
-.advanced {
-  font-size: var(--fs-control);
-  line-height: var(--lh-control);
-}
-
-/* 静かのボタンと同じ見た目に、開閉を示す山形を付ける */
-.advanced > summary {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--control-height);
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-control);
-  color: var(--muted);
-  font-weight: var(--fw-medium);
-  cursor: pointer;
-  list-style: none;
-}
-
-.advanced > summary::-webkit-details-marker {
-  display: none;
-}
-
-.advanced > summary::after {
+/* ---------- 詳細設定（ボタンから開く浮く面。操作行の高さを変えない。閉じ方は popover.ts） ---------- */
+.advanced-button::after {
   content: "";
   width: var(--space-2);
   height: var(--space-2);
@@ -170,27 +164,26 @@
   transform: translateY(-25%) rotate(45deg);
 }
 
-.advanced[open] > summary::after {
-  transform: translateY(25%) rotate(-135deg);
-}
-
-.advanced > summary:hover {
-  background: var(--secondary);
-  color: var(--text);
-}
-
-.advanced[open] {
-  flex-basis: 100%;
-}
-
 .advanced-body {
+  /* popover の既定の中央配置をやめ、popover.ts がボタンの真下に置く */
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(var(--panel-width), calc(100vw - var(--space-4)));
+  padding: var(--space-4);
+  border: var(--line) solid var(--rule);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  color: var(--text);
+  font-size: var(--fs-control);
+  line-height: var(--lh-control);
+}
+
+.advanced-body:popover-open {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  margin-top: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-control);
-  background: var(--raised);
 }
 
 .advanced-item {
@@ -328,7 +321,7 @@
 }
 
 .col-menu-list {
-  /* popover の既定の中央配置をやめ、preview.ts がボタンの真下に置く */
+  /* popover の既定の中央配置をやめ、popover.ts がボタンの真下に置く */
   position: fixed;
   inset: auto;
   margin: 0;

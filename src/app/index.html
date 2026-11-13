@@ -18,9 +18,12 @@
 
     <div class="page">
       <main class="panes">
+        <!-- 左右に並ぶ間、2 区画は 4 行を共有する: 1 見出し行 / 2 形式の行 / 3 操作の行 / 4 作業欄（styles.css）。
+             どの行も 1 行に収まりやすい中身にして、片側だけが高くなって相手側に空きができないようにする -->
         <section class="card pane" aria-labelledby="input-title">
           <div class="card-head">
             <h2 id="input-title">入力</h2>
+            <span id="detected" class="meta"></span>
             <span id="input-status" class="local-status" role="status" aria-live="polite"></span>
             <button type="button" id="undo-clear-button" class="secondary" hidden>クリアを取り消す</button>
           </div>
@@ -29,14 +32,13 @@
               形式
               <select id="input-format"></select>
             </label>
-            <span class="toolbar-end">
-              <button type="button" id="paste-button" class="secondary" title="クリップボードの内容を入力欄に貼り付けます">
-                貼り付け
-              </button>
-              <button type="button" id="clear-button" class="destructive">クリア</button>
-            </span>
           </div>
-          <p class="card-note"><span id="detected" class="meta"></span></p>
+          <div class="toolbar">
+            <button type="button" id="paste-button" class="secondary" title="クリップボードの内容を入力欄に貼り付けます">
+              貼り付け
+            </button>
+            <button type="button" id="clear-button" class="destructive">クリア</button>
+          </div>
           <textarea
             id="input"
             class="mono workarea"
@@ -65,10 +67,51 @@
               形式
               <select id="output-format"></select>
             </label>
+            <button
+              type="button"
+              id="advanced-button"
+              class="quiet advanced-button"
+              popovertarget="advanced-panel"
+              aria-haspopup="dialog"
+              data-formats="markdown box ascii json"
+            >
+              詳細設定
+            </button>
+            <div id="advanced-panel" class="advanced-body" popover="auto" role="dialog" aria-label="詳細設定" tabindex="-1">
+              <div class="advanced-item" data-formats="box ascii">
+                <label class="field">
+                  <input type="checkbox" id="opt-row-separators" aria-describedby="hint-row-separators" />
+                  行の間に罫線
+                </label>
+                <p id="hint-row-separators" class="hint">オンで全ての行の間に区切り線を入れます。オフなら見出しの下だけです。</p>
+              </div>
+              <div class="advanced-item" data-formats="markdown box ascii">
+                <label class="field">
+                  曖昧幅の文字
+                  <select id="opt-ambiguous" aria-describedby="hint-ambiguous">
+                    <option value="1">幅 1（半角）</option>
+                    <option value="2">幅 2（全角）</option>
+                  </select>
+                </label>
+                <p id="hint-ambiguous" class="hint">
+                  「— × ○ ※ →」や罫線文字を何文字分として桁を揃えるかです。貼り付け先で縦線がずれるときに切り替えます。
+                </p>
+              </div>
+              <div class="advanced-item" data-formats="json">
+                <label class="field">
+                  <input type="checkbox" id="opt-json-numbers" aria-describedby="hint-json-numbers" />
+                  数値を number にする
+                </label>
+                <p id="hint-json-numbers" class="hint">整数・小数に見えるセルを、引用符の付かない数値として出力します。</p>
+              </div>
+            </div>
+          </div>
+          <div class="toolbar">
             <label class="field" data-formats="markdown">
               <input type="checkbox" id="opt-markdown-pad" aria-describedby="hint-markdown-pad" />
               桁を揃える
             </label>
+            <span id="hint-markdown-pad" class="meta" data-formats="markdown">列の幅を空白で揃えます（表示結果は同じ）</span>
             <label class="field" data-formats="box">
               線種
               <select id="opt-box-style"></select>
@@ -85,46 +128,12 @@
               スタイル
               <select id="opt-html-style" aria-describedby="hint-html-style"></select>
             </label>
+            <span id="hint-html-style" class="meta" data-formats="html">枠線と余白あり: 貼り付け先でも罫線が付きます</span>
             <label class="field" data-formats="json">
               構造
               <select id="opt-json-structure"></select>
             </label>
-            <details class="advanced" data-formats="markdown box ascii json">
-              <summary>詳細設定</summary>
-              <div class="advanced-body">
-                <div class="advanced-item" data-formats="box ascii">
-                  <label class="field">
-                    <input type="checkbox" id="opt-row-separators" aria-describedby="hint-row-separators" />
-                    行の間に罫線
-                  </label>
-                  <p id="hint-row-separators" class="hint">オンで全ての行の間に区切り線を入れます。オフなら見出しの下だけです。</p>
-                </div>
-                <div class="advanced-item" data-formats="markdown box ascii">
-                  <label class="field">
-                    曖昧幅の文字
-                    <select id="opt-ambiguous" aria-describedby="hint-ambiguous">
-                      <option value="1">幅 1（半角）</option>
-                      <option value="2">幅 2（全角）</option>
-                    </select>
-                  </label>
-                  <p id="hint-ambiguous" class="hint">
-                    「— × ○ ※ →」や罫線文字を何文字分として桁を揃えるかです。貼り付け先で縦線がずれるときに切り替えます。
-                  </p>
-                </div>
-                <div class="advanced-item" data-formats="json">
-                  <label class="field">
-                    <input type="checkbox" id="opt-json-numbers" aria-describedby="hint-json-numbers" />
-                    数値を number にする
-                  </label>
-                  <p id="hint-json-numbers" class="hint">整数・小数に見えるセルを、引用符の付かない数値として出力します。</p>
-                </div>
-              </div>
-            </details>
           </div>
-          <p class="card-note">
-            <span id="hint-markdown-pad" class="meta" data-formats="markdown">桁を揃える: 列の幅を空白で揃えます（表示結果は同じ）</span>
-            <span id="hint-html-style" class="meta" data-formats="html">枠線と余白あり: 貼り付け先でも罫線が付きます</span>
-          </p>
           <textarea id="output" class="mono workarea" spellcheck="false" readonly aria-labelledby="output-title"></textarea>
         </section>
       </main>

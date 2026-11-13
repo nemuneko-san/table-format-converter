@@ -1,4 +1,5 @@
 import type { Table } from "../lib/model";
+import { anchorPopover } from "./popover";
 
 /** これを超えるセル数の表はプレビューを省略する（Q50 司令塔判断） */
 export const PREVIEW_CELL_LIMIT = 5000;
@@ -13,9 +14,6 @@ export type PreviewHandlers = {
 
 /** SVG 要素を作るための名前空間の識別子（接続先ではない） */
 const SVG_NS = "http://www.w3.org/2000/svg";
-/** 列メニューとボタンの間の隙間と、画面の端から離す幅（px） */
-const MENU_OFFSET = 4;
-const MENU_EDGE = 8;
 
 /** 列操作のアイコン（16px、線のみ）。外部リソースを使わないようにパスを直接持つ */
 const ICON_PATHS = {
@@ -39,22 +37,6 @@ function icon(kind: IconKind): SVGSVGElement {
   return svg;
 }
 
-type PopoverElement = HTMLElement & { hidePopover?: () => void };
-
-/** popover として開いているか（:popover-open を解釈できない環境では false） */
-function isOpen(menu: Element): boolean {
-  try {
-    return menu.matches(":popover-open");
-  } catch {
-    return false;
-  }
-}
-
-/** 開いていれば閉じる（popover 非対応の環境では何もしない） */
-function closeMenu(menu: PopoverElement): void {
-  if (isOpen(menu)) menu.hidePopover?.();
-}
-
 /** メニューの項目: 記号に頼らず文字で意味を示す */
 function menuItem(kind: IconKind, text: string, label: string, onClick: () => void, disabled: boolean): HTMLButtonElement {
   const el = document.createElement("button");
@@ -73,7 +55,7 @@ function menuItem(kind: IconKind, text: string, label: string, onClick: () => vo
 
 /**
  * 列見出しの「列の操作」ボタンと、その下に開くメニュー。
- * 開閉は Web 標準の popover（Chrome 114〜）に任せ、Esc と外側のクリックで閉じる。フォーカスがメニューの外へ出ても閉じる
+ * 開閉・配置・閉じ方は popover.ts（Esc・外側のクリック・フォーカスが外へ出る・スクロール・ウィンドウの幅の変更で閉じる）
  */
 function columnMenu(
   c: number,
@@ -94,37 +76,23 @@ function columnMenu(
   trigger.title = label;
   trigger.setAttribute("aria-label", label);
   trigger.append(icon("menu"));
+  // 列が 1 つだけの表では、移動も削除もできないのでボタンごと押せなくする
+  trigger.disabled = cols <= 1;
 
-  const menu: PopoverElement = document.createElement("div");
+  const menu = document.createElement("div");
   menu.id = id;
   menu.className = "col-menu-list";
   menu.setAttribute("popover", "auto");
   menu.setAttribute("role", "menu");
   menu.setAttribute("aria-label", label);
+  // 項目の間の隙間をクリックしてもフォーカスが面の中に残り、閉じないようにする
+  menu.tabIndex = -1;
   menu.append(
     menuItem("left", "左へ移動", `左へ移動（${c + 1} 列目）`, () => run(() => handlers.onMoveColumn(c, -1), c - 1), c === 0),
     menuItem("right", "右へ移動", `右へ移動（${c + 1} 列目）`, () => run(() => handlers.onMoveColumn(c, 1), c + 1), c === cols - 1),
     menuItem("delete", "列を削除", `列を削除（${c + 1} 列目）`, () => run(() => handlers.onDeleteColumn(c), Math.min(c, cols - 2)), cols <= 1),
   );
-  // 開いたらボタンの真下に置き（画面の外へはみ出さないよう寄せる）、最初の押せる項目にフォーカスを移す
-  menu.addEventListener("toggle", () => {
-    if (!isOpen(menu)) return;
-    const view = menu.ownerDocument.defaultView;
-    const rect = trigger.getBoundingClientRect();
-    const width = menu.offsetWidth;
-    const height = menu.offsetHeight;
-    const maxLeft = (view?.innerWidth ?? width) - width - MENU_EDGE;
-    const below = rect.bottom + MENU_OFFSET;
-    const fitsBelow = below + height <= (view?.innerHeight ?? below + height);
-    menu.style.left = `${Math.max(MENU_EDGE, Math.min(rect.right - width, maxLeft))}px`;
-    menu.style.top = `${fitsBelow ? below : Math.max(MENU_EDGE, rect.top - MENU_OFFSET - height)}px`;
-    menu.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus({ preventScroll: true });
-  });
-  menu.addEventListener("focusout", (event) => {
-    const next = event.relatedTarget;
-    if (next instanceof Node && (menu.contains(next) || next === trigger)) return;
-    closeMenu(menu);
-  });
+  anchorPopover(menu, trigger, "end");
   // 上下の矢印キーで項目を移る
   menu.addEventListener("keydown", (event) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
@@ -191,15 +159,6 @@ export function renderPreview(container: HTMLElement, table: Table | null, handl
     note.textContent = `表が大きいため（${cells.toLocaleString()} セル）プレビューを省略しました。変換とコピーは行えます。`;
     container.replaceChildren(note);
     return;
-  }
-  // メニューは画面に固定して開くので、ページや表がスクロールしたら閉じる（ボタンから離れて見えないように）
-  if (!container.dataset.menuScrollBound) {
-    container.dataset.menuScrollBound = "true";
-    container.ownerDocument.addEventListener(
-      "scroll",
-      () => container.querySelectorAll<PopoverElement>(".col-menu-list").forEach(closeMenu),
-      { capture: true, passive: true },
-    );
   }
   // 列の操作で表が描き直されたあと、操作した列（移動先・削除後の隣）の「列の操作」ボタンにフォーカスを戻す
   const run = (action: () => void, focusCol: number): void => {

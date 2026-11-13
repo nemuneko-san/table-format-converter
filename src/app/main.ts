@@ -18,6 +18,7 @@ import {
   type Settings,
 } from "../lib/settings";
 import { copyRichHtml, copyText, readClipboardText } from "./clipboard";
+import { anchorPopover } from "./popover";
 import { renderPreview } from "./preview";
 
 const DRAFT_SAVE_DELAY_MS = 300;
@@ -40,6 +41,7 @@ type ClearedState = {
   table: Table | null;
   history: Table[];
   headerOverride: boolean | null;
+  inputFormat: InputFormat;
 };
 
 function byId<T extends HTMLElement>(id: string): T {
@@ -85,6 +87,8 @@ function elements() {
     clear: byId<HTMLButtonElement>("clear-button"),
     transpose: byId<HTMLButtonElement>("transpose-button"),
     openOptions: byId<HTMLButtonElement>("open-options"),
+    advancedButton: byId<HTMLButtonElement>("advanced-button"),
+    advancedPanel: byId<HTMLDivElement>("advanced-panel"),
     status: byId<HTMLDivElement>("status"),
     inputStatus: byId<HTMLSpanElement>("input-status"),
     copyStatus: byId<HTMLSpanElement>("copy-status"),
@@ -149,9 +153,20 @@ export async function main(): Promise<void> {
 
   // 操作した場所の近く（入力・出力・プレビューの区画の見出し行）に出す成功メッセージ。場所は常に確保してある
   const flashTimers = new Map<HTMLElement, ReturnType<typeof setTimeout>>();
-  const note = (target: HTMLElement, message: string, transient: boolean): void => {
+  // spoken を渡すと、画面には短い message を、読み上げには spoken を出す（狭い見出し行で文が切れないように）
+  const note = (target: HTMLElement, message: string, transient: boolean, spoken?: string): void => {
     clearTimeout(flashTimers.get(target));
-    target.textContent = message;
+    if (spoken === undefined) {
+      target.textContent = message;
+    } else {
+      const visible = document.createElement("span");
+      visible.setAttribute("aria-hidden", "true");
+      visible.textContent = message;
+      const voice = document.createElement("span");
+      voice.className = "sr-only";
+      voice.textContent = spoken;
+      target.replaceChildren(visible, voice);
+    }
     if (!transient) return;
     flashTimers.set(
       target,
@@ -160,7 +175,7 @@ export async function main(): Promise<void> {
       }, FLASH_MS),
     );
   };
-  const flash = (target: HTMLElement, message: string): void => note(target, message, true);
+  const flash = (target: HTMLElement, message: string, spoken?: string): void => note(target, message, true, spoken);
 
   /** 表があるか・出力が空か・編集があるかで、押せるボタンと編集中の表示を切り替える */
   const renderControls = (): void => {
@@ -358,7 +373,8 @@ export async function main(): Promise<void> {
     if (el.output.value === "") return;
     try {
       await action();
-      flash(el.copyStatus, done);
+      // コピー 3 種とも画面には同じ短い文を出し、種類の区別は読み上げの文で伝える
+      flash(el.copyStatus, "コピーしました。", done);
     } catch {
       setStatus("クリップボードにコピーできませんでした。", "error");
     }
@@ -422,7 +438,7 @@ export async function main(): Promise<void> {
       .catch(() => setStatus("クリップボードを読み取れませんでした。入力欄で Ctrl+V を使ってください。", "error"));
   });
   el.clear.addEventListener("click", () => {
-    const before: ClearedState = { input: el.input.value, outcome, table, history, headerOverride };
+    const before: ClearedState = { input: el.input.value, outcome, table, history, headerOverride, inputFormat };
     el.input.value = "";
     onInputChanged();
     if (before.input !== "") {
@@ -443,6 +459,9 @@ export async function main(): Promise<void> {
     table = snapshot.table;
     history = snapshot.history;
     headerOverride = snapshot.headerOverride;
+    // クリアのあとで入力形式を変えていても、クリア直前の形式に戻す（表モデルと食い違わないように）
+    inputFormat = snapshot.inputFormat;
+    el.inputFormat.value = snapshot.inputFormat;
     editingCell = null;
     outputErrorShown = false;
     renderParseStatus();
@@ -466,6 +485,8 @@ export async function main(): Promise<void> {
   el.openOptions.addEventListener("click", () => void chrome.runtime.openOptionsPage());
 
   el.input.ownerDocument.defaultView?.addEventListener("pagehide", saveDraftNow);
+  // 詳細設定は操作行の高さを変えない浮く面にする（開いたまま設定を変えると出力がすぐ変わる）
+  anchorPopover(el.advancedPanel, el.advancedButton, "start");
 
   // 出力系の設定変更は再描画だけにしてプレビュー上の編集を保つ。前処理が変わったときだけ入力から作り直す
   onSettingsChanged((next) => {
