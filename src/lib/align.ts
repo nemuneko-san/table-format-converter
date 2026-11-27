@@ -7,7 +7,7 @@ export function isNumericLike(cell: string): boolean {
 
 /** 数値判定で無視するセル（空・ダッシュ類のみ） */
 function isIgnorable(cell: string): boolean {
-  return cell === "" || /^[—–―−‐\-]+$/.test(cell);
+  return cell === "" || /^[—–―−‐-]+$/.test(cell);
 }
 
 /** 列が数値列か（無視対象を除く全セルが数値らしく、1 つ以上ある） */

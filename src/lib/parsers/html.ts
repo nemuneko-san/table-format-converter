@@ -4,7 +4,7 @@ const BLOCK_TAGS = new Set(["P", "DIV", "LI", "UL", "OL", "H1", "H2", "H3", "H4"
 
 /** セルのテキスト。<br> とブロック要素の区切りをセル内改行にし、それ以外の空白は 1 個に詰める */
 export function cellText(node: Node): string {
-  return collect(node).replace(/[ \t\r\n\f]+/g, " ").replace(/ ?\u0000 ?/g, "\n").replace(/\n+/g, "\n").replace(/^[ \n]+|[ \n]+$/g, "");
+  return collect(node).replace(/[ \t\r\n\f]+/g, " ").replace(/ ?\0 ?/g, "\n").replace(/\n+/g, "\n").replace(/^[ \n]+|[ \n]+$/g, "");
 }
 
 /** 表示されない要素。中のテキストをセルに入れない */
@@ -13,7 +13,7 @@ const HIDDEN_TAGS = new Set(["SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT"]);
 /** セル内に入れ子になった table。セルのテキストを半角スペースでつなぐ */
 function nestedTableText(table: Element): string {
   const cells = tableRows(table).flatMap((tr) => directCells(tr));
-  return ` ${cells.map((cell) => collect(cell).replace(/\u0000/g, " ")).join(" ")} `;
+  return ` ${cells.map((cell) => collect(cell).replaceAll("\u0000", " ")).join(" ")} `;
 }
 
 function collect(node: Node): string {

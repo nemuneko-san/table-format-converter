@@ -23,7 +23,7 @@ export function escapeHtml(text: string): string {
  * 許可: http: / https: / mailto: / # で始まる / スキームの無い相対パス（// や \ を含むものは除く）
  */
 export function safeHref(url: string): string | null {
-  const cleaned = url.replace(/[\u0000- \u007f-\u009f]/g, "");
+  const cleaned = url.replace(/[\0-\x20\x7f-\x9f]/g, "");
   if (cleaned === "") return null;
   if (/^(https?|mailto):/i.test(cleaned)) return cleaned;
   if (cleaned.startsWith("#")) return cleaned;
