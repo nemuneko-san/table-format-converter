@@ -1,0 +1,63 @@
+name: 不具合の報告
+description: 変換結果の誤りや、動作の不具合を報告します
+title: "[不具合] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        不具合の報告ありがとうございます。脆弱性は、この Issue ではなく [SECURITY.md](https://github.com/nemuneko-san/table-format-converter/security/policy) の手順で報告してください。
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      description: 何をしたかを、順番に書いてください。
+      placeholder: |
+        1. 入力欄に表を貼り付ける
+        2. 出力形式を「罫線文字の表」にする
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待した結果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の結果
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: 入力データ（任意）
+      description: 不具合が起きた入力があれば貼ってください。機密情報は伏せてください。
+      render: text
+    validations:
+      required: false
+  - type: input
+    id: extension-version
+    attributes:
+      label: 拡張機能のバージョン
+      description: "`chrome://extensions` の拡張の詳細で確認できます。"
+      placeholder: 例) 1.0.18
+    validations:
+      required: true
+  - type: input
+    id: chrome-version
+    attributes:
+      label: Chrome のバージョン
+      description: "`chrome://version` で確認できます。"
+      placeholder: 例) 130.0.6723.92
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: 例) Windows 11 / macOS 15 / Ubuntu 24.04
+    validations:
+      required: true
