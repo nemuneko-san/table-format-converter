@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "vite",
     "icons": "node scripts/gen-icons.mjs",
+    "screenshots": "npm run build && node scripts/screenshots.mjs",
     "test": "vitest run",
     "build": "tsc --noEmit && vite build && node scripts/zip.mjs",
     "lint": "eslint .",
@@ -23,6 +24,7 @@
     "eslint": "^10.15.0",
     "globals": "^17.14.0",
     "happy-dom": "^21.0.4",
+    "playwright": "1.58.2",
     "sharp": "^0.35.5",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.74.0",
