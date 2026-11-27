@@ -2,6 +2,11 @@
   "name": "table-format-converter",
   "version": "1.0.18",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nemuneko-san/table-format-converter.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
