@@ -35,7 +35,7 @@ describe("依頼文のサンプル（罫線文字の表）", () => {
   });
 
   it("Markdown（桁揃え）に変換すると表示幅で揃う", () => {
-    const out = serialize(parseSample().table, "markdown", { ...DEFAULT_SETTINGS, markdownPad: true });
+    const out = serialize(parseSample().table, "markdown", { ...DEFAULT_SETTINGS, markdownPad: true, ambiguousWide: false });
     expect(out.split("\n").slice(0, 3)).toEqual([
       "| 四半期 | 売上（百万円） | 前期比 | 担当 |",
       "| ------ | -------------: | -----: | ---- |",

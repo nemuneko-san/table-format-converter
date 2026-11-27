@@ -241,12 +241,24 @@ describe("設定の正規化", () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
       rowSeparators: true,
       boxStyle: "single",
-      ambiguousWide: false,
+      ambiguousWide: true,
       markdownPad: false,
       csvDelimiter: ",",
       htmlStyle: "bordered",
       jsonStructure: "objects",
       jsonNumbers: false,
     });
+  });
+});
+
+describe("曖昧幅の既定値", () => {
+  it("既定値は幅 2（ambiguousWide: true）", () => {
+    expect(DEFAULT_SETTINGS.ambiguousWide).toBe(true);
+  });
+
+  it("保存値が無いときは 2、明示的に保存した false は尊重する", () => {
+    expect(normalizeSettings(undefined).ambiguousWide).toBe(true);
+    expect(normalizeSettings({}).ambiguousWide).toBe(true);
+    expect(normalizeSettings({ ambiguousWide: false }).ambiguousWide).toBe(false);
   });
 });

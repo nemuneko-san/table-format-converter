@@ -516,7 +516,7 @@ describe("D1 フェンスの内側に表が無いときは外側から抽出す�
   it("フェンスで囲んだ依頼文サンプルは往復で一致する", () => {
     const r = ok(`以下の表です。\n\`\`\`\n${SAMPLE_BOX}\n\`\`\`\nよろしく`);
     expect(r.format).toBe("box");
-    expect(serialize(r.table, "box", DEFAULT_SETTINGS)).toBe(SAMPLE_BOX);
+    expect(serialize(r.table, "box", { ...DEFAULT_SETTINGS, ambiguousWide: false })).toBe(SAMPLE_BOX);
   });
 
   it("フェンスの内側にも外側にも複数行の表が無ければ、内側の 1 行 CSV を使う", () => {

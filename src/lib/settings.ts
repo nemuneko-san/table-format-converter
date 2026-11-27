@@ -13,7 +13,7 @@ export type Settings = OutputOptions & {
 
 export const DEFAULT_SETTINGS: Settings = {
   outputFormat: "markdown",
-  ambiguousWide: false,
+  ambiguousWide: true,
   markdownPad: false,
   boxStyle: "single",
   rowSeparators: true,
