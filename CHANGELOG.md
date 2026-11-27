@@ -7,6 +7,7 @@
 ### Changed
 
 - 開発用の依存を更新した（vite 8、vitest 5、@crxjs/vite-plugin 3、happy-dom 21 など。TypeScript は 6 系）。開発に必要な Node.js を 22.12 以上にした。
+- README の罫線文字の表の見本を、既定の曖昧幅 2 で生成したものに差し替えた。
 
 ## [1.0.18] - 2026-11-27
 
