@@ -435,7 +435,10 @@ describe("再検証の指摘（フェーズ 1）", () => {
   function fakeOpen(panel: HTMLElement): ReturnType<typeof vi.fn> {
     const hide = vi.fn();
     const original = panel.matches.bind(panel);
-    panel.matches = (selector: string) => selector === ":popover-open" || original(selector);
+    Object.defineProperty(panel, "matches", {
+      configurable: true,
+      value: (selector: string): boolean => selector === ":popover-open" || original(selector),
+    });
     Object.assign(panel, { hidePopover: hide });
     return hide;
   }
