@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [1.0.18] - 2026-11-27
+
 ### Added
 
 - ESLint を導入し、GitHub Actions の CI（lint・typecheck・test・build）とリリース（タグから zip を Releases に添付）のワークフローを追加した。
@@ -15,6 +17,9 @@
 - 曖昧幅の文字の既定値を幅 1 から幅 2 に変更した。
 - `package.json` に `license` と `repository` を追加した。
 
-## [1.0.18]
+## 過去の版
 
-この版以前の変更は記録していない。
+1.0.17 以前の変更は記録していない。
+
+[Unreleased]: https://github.com/nemuneko-san/table-format-converter/compare/v1.0.18...HEAD
+[1.0.18]: https://github.com/nemuneko-san/table-format-converter/releases/tag/v1.0.18
