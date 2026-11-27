@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- README に Chrome で拡張を実際に動かした画面のスクリーンショット（全体・罫線文字の表・ASCII 罫線・Markdown の桁揃え）を載せた。罫線表は表示するフォントで見え方が変わるため、テキストの見本は畳んで残した。
+- スクリーンショットを撮り直すスクリプト `scripts/screenshots.mjs`（`npm run screenshots`。Playwright の Chromium で拡張を読み込む）を追加した。
+
 ### Changed
 
 - 開発用の依存を更新した（vite 8、vitest 5、@crxjs/vite-plugin 3、happy-dom 21 など。TypeScript は 6 系）。開発に必要な Node.js を 22.12 以上にした。
