@@ -6,6 +6,8 @@
 
 いろいろな表記法の表を貼り付けると、選んだ形式に相互変換して表示・コピーできる Chrome 拡張です。
 
+![Table Format Converter の変換画面。左の入力欄に貼り付けた TSV が、右の出力欄に罫線文字の表として変換されている](docs/images/overview.png)
+
 ## 特長
 
 - Markdown・TSV・CSV・罫線文字の表・ASCII 罫線の表・HTML・JSON を、入力・出力とも相互に変換できます。
@@ -106,7 +108,12 @@ npm run build
 | banana | 3 | |
 ```
 
-「桁を揃えて整形する」（`markdownPad`）をオンにしたとき:
+「桁を揃えて整形する」（`markdownPad`）をオンにしたとき（画像は Chrome で拡張を実際に動かした画面です）:
+
+![Markdown の「桁を揃える」をオンにしたときの出力欄](docs/images/output-markdown-pad.png)
+
+<details>
+<summary>テキスト（コピー用）</summary>
 
 ```markdown
 | 名前         | 数量 | 備考         |
@@ -114,6 +121,8 @@ npm run build
 | りんご \| 赤 |   12 | 甘い<br>です |
 | banana       |    3 |              |
 ```
+
+</details>
 
 #### TSV
 
@@ -145,7 +154,14 @@ banana;3;
 
 単線（既定）:
 
-次の 2 つは曖昧幅 1（`ambiguousWide: false`）で生成した見本で、罫線文字を半角 1 で数える環境（等幅フォントの多くのエディタなど）で崩れません。既定の曖昧幅は 2 です。CJK 環境の端末（罫線文字を全角で表示する環境）では、既定の幅 2 で揃います。
+![罫線文字の表（単線）の出力欄](docs/images/output-box.png)
+
+- 画像は、Chrome で拡張を実際に動かした画面です。フォントは BIZ UDGothic で撮っています（既定の設定: 単線・行の間に罫線あり・曖昧幅 2）。
+- テキストの見え方は、表示するフォントで変わります。罫線文字が半角で表示される環境では、設定の「曖昧幅の文字」で幅 1 を選んでください。
+- 下のテキスト見本は、曖昧幅 1（`ambiguousWide: false`）で生成したものです。
+
+<details>
+<summary>テキスト（コピー用）</summary>
 
 ```text
 ┌─────────────┬──────┬───────────┐
@@ -156,6 +172,8 @@ banana;3;
 │ banana      │    3 │           │
 └─────────────┴──────┴───────────┘
 ```
+
+</details>
 
 角丸（そのほかに太線・二重線があります）:
 
@@ -171,6 +189,11 @@ banana;3;
 
 #### ASCII 罫線
 
+![ASCII 罫線の表の出力欄（Chrome で拡張を実際に動かした画面）](docs/images/output-ascii.png)
+
+<details>
+<summary>テキスト（コピー用）</summary>
+
 ```text
 +-------------+------+-----------+
 | 名前        | 数量 | 備考      |
@@ -180,6 +203,8 @@ banana;3;
 | banana      |    3 |           |
 +-------------+------+-----------+
 ```
+
+</details>
 
 <details>
 <summary>HTML</summary>
@@ -317,7 +342,16 @@ npm run typecheck   # 型チェック（tsc --noEmit）
 npm test            # Vitest（happy-dom）
 npm run build       # 型チェック → dist/ 生成 → zip 生成
 npm run icons       # public/icons/icon.svg から 16/48/128 PNG を生成
+npm run screenshots # README 用の画像（docs/images/）を撮り直す（ビルド後に Playwright の Chromium で拡張を動かす）
 node scripts/gen-eaw.mjs <EastAsianWidth.txt>  # 文字幅データ src/lib/eaw-data.ts を再生成
+```
+
+`npm run screenshots` は Playwright の Chromium（初回は `npx playwright install chromium`）で拡張を読み込みます。拡張は headless では読み込めないため（headed で起動します）、画面のない環境では `xvfb-run -a npm run screenshots` で実行してください。
+
+画像は等幅の和文フォント BIZ UDGothic（SIL Open Font License。[google/fonts の `ofl/bizudgothic/`](https://github.com/google/fonts/tree/main/ofl/bizudgothic)）で撮っています。和文の等幅フォントが無い環境では罫線が揃わないため、フォントを入手し、そのディレクトリを `SCREENSHOT_FONT_DIR` に渡してください。撮影するブラウザにだけ読み込ませ、システムのフォント設定は変えません。フォントファイルはリポジトリに含めません。
+
+```sh
+SCREENSHOT_FONT_DIR=/path/to/bizudgothic xvfb-run -a npm run screenshots
 ```
 
 - 仕様: [docs/spec.md](docs/spec.md)
