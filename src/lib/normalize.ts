@@ -3,7 +3,7 @@ import { columnCount, type RawTable, type Table } from "./model";
 
 /** セル前後の半角・全角空白を除去する（内部の連続空白は保持。Q32） */
 export function trimCell(cell: string): string {
-  return cell.replace(/^[ \t　]+|[ \t　]+$/g, "");
+  return cell.replace(/^[ \t\u3000]+|[ \t\u3000]+$/g, "");
 }
 
 /** 内容から 1 行目がヘッダーらしいかを推定する */

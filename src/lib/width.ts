@@ -1,7 +1,7 @@
 import { AMBIGUOUS_RANGES, WIDE_RANGES } from "./eaw-data";
 
 export type WidthOptions = {
-  /** 曖昧幅（East_Asian_Width=A）の文字を幅 2 と数えるか（既定 false = 幅 1） */
+  /** 曖昧幅（East_Asian_Width=A）の文字を幅 2 と数えるか（設定の既定は true = 幅 2。ここでは明示して渡す） */
   ambiguousWide: boolean;
 };
 
@@ -85,6 +85,8 @@ export function graphemeWidth(grapheme: string, options: WidthOptions): number {
 }
 
 // 書記素クラスタを作りうる文字（結合文字・ゼロ幅・異体字セレクタ・サロゲート・ハングル字母・キーキャップ）
+// 結合文字・ZWJ 等を文字クラスに並べて「幅 0 / 書記素連結」を判定するのが意図。
+// eslint-disable-next-line no-misleading-character-class
 const CLUSTERING = /[\p{M}\p{Cf}ᅠ-ᇿힰ-퟿\uD800-\uDFFF⃣]|\p{Emoji_Presentation}|\p{Extended_Pictographic}/u;
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });

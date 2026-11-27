@@ -32,7 +32,7 @@
 | Q20 | 結合セル | おまかせ | 司令塔判断を参照 |
 | Q21 | 罫線表出力の行間罫線 | 設定で切り替え（既定は全ての行の間に罫線） | `rowSeparators`（既定 true）。罫線文字・ASCII の両方に効く |
 | Q22 | 罫線文字の線種 | 単線 / 太線 / 二重線 / 角丸から選べる（既定は単線） | `boxStyle` |
-| Q23 | 曖昧幅 | 設定で 1 / 2 を切り替え（既定は 1） | `ambiguousWide`（既定 false）。U+2212「−」は Unicode データ上 N だが、質問書 Q23 の注記が曖昧幅の例に挙げているため曖昧幅として扱う（`src/lib/width.ts` の `EXTRA_AMBIGUOUS`） |
+| Q23 | 曖昧幅 | 設定で 1 / 2 を切り替え（既定は 2） | `ambiguousWide`（既定 true）。U+2212「−」は Unicode データ上 N だが、質問書 Q23 の注記が曖昧幅の例に挙げているため曖昧幅として扱う（`src/lib/width.ts` の `EXTRA_AMBIGUOUS`） |
 | Q24 | 絵文字・結合文字・半角カナ | 絵文字 2、結合文字・ゼロ幅 0、半角カナ 1 | `src/lib/width.ts`（Unicode EastAsianWidth＋`Intl.Segmenter`）。キーキャップ絵文字（`1️⃣`）も 2。半角カナ＋半角濁点・半濁点（`ｶﾞ`）は 1 書記素だが 2 桁を占めるので 2 と数える |
 | Q25 | Markdown の桁揃え | 設定で切り替え（既定は整形なし） | `markdownPad`（既定 false） |
 | Q26 | 列の揃え | 数値らしい列を自動検出して右寄せ（揃え指定がある入力はそちらを優先） | `effectiveAligns` |

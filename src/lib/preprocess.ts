@@ -22,6 +22,8 @@ export type Preprocessed = {
 };
 
 // ESC [ ... 終端文字（CSI）と ESC ] ... BEL/ST（OSC）、および単独の 2 文字シーケンス
+// ANSI エスケープ列を除去する正規表現なので、制御文字を含めるのが意図。
+// eslint-disable-next-line no-control-regex
 const ANSI_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)|\u001b[@-Z\\-_]/g;
 
 export function stripAnsi(text: string): string {

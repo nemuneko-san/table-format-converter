@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: タグと version の一致を確認
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          man=$(node -p "require('./manifest.json').version")
+          if [ "$TAG" != "v$pkg" ] || [ "$TAG" != "v$man" ]; then
+            echo "version 不一致: tag=$TAG package.json=$pkg manifest.json=$man" >&2
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm test
+      # build スクリプトが型チェック・vite build・zip 作成（scripts/zip.mjs）まで行う
+      - run: npm run build
+      - name: Release を作成して zip を添付
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" table-format-converter.zip --title "$TAG" --generate-notes
