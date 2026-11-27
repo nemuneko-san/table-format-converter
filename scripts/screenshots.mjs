@@ -1,7 +1,9 @@
 // README 用のスクリーンショットを撮る。ビルド済みの dist/ を Chromium に読み込み、
 // 拡張の変換画面（chrome-extension://<id>/src/app/index.html）を実際に操作して撮影する。
 // 使い方: npm run screenshots（先に npm run build が走る）
-import { mkdtempSync, rmSync, mkdirSync, existsSync } from "node:fs";
+// 環境変数 SCREENSHOT_FONT_DIR に和文の等幅フォント（BIZ UDGothic など）のディレクトリを渡すと、
+// 撮影するブラウザにだけそのフォントを読み込ませる（システム・ユーザーのフォント設定は変えない）。
+import { mkdtempSync, rmSync, mkdirSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,11 +21,31 @@ mkdirSync(outDir, { recursive: true });
 const INPUT = '名前\t数量\t備考\nりんご | 赤\t12\t"甘い\nです"\nbanana\t3\t\n';
 
 const userDataDir = mkdtempSync(join(tmpdir(), "tfc-shot-"));
+
+// 撮影時だけフォントを足す。システムの設定を取り込み、指定ディレクトリを足した fonts.conf を一時的に作り、
+// ブラウザのプロセスにだけ FONTCONFIG_FILE で渡す
+const fontDir = process.env.SCREENSHOT_FONT_DIR ? resolve(process.env.SCREENSHOT_FONT_DIR) : undefined;
+const env = { ...process.env };
+if (fontDir) {
+  if (!existsSync(fontDir)) throw new Error(`SCREENSHOT_FONT_DIR が存在しません: ${fontDir}`);
+  const fontsConf = join(userDataDir, "fonts.conf");
+  const escaped = fontDir.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  writeFileSync(
+    fontsConf,
+    `<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig>\n  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>\n  <dir>${escaped}</dir>\n</fontconfig>\n`,
+  );
+  env.FONTCONFIG_FILE = fontsConf;
+} else {
+  console.warn(
+    "SCREENSHOT_FONT_DIR が未指定です。和文の等幅フォント（BIZ UDGothic など）が環境に無いと、罫線文字が半角で描かれ、罫線が揃いません。",
+  );
+}
 // headless では拡張を読み込めないため、headed で起動する。表示のある環境が無ければ xvfb-run 経由で実行する
 const context = await chromium.launchPersistentContext(userDataDir, {
   headless: false,
   viewport: { width: 1280, height: 900 },
   deviceScaleFactor: 2,
+  env,
   args: [`--disable-extensions-except=${dist}`, `--load-extension=${dist}`],
 });
 
@@ -88,12 +110,28 @@ try {
         },
         text,
       );
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
       const { root } = await cdp.send("DOM.getDocument", { depth: 0 });
       const { nodeId } = await cdp.send("DOM.querySelector", { nodeId: root.nodeId, selector: "#font-probe" });
       const { fonts } = await cdp.send("CSS.getPlatformFontsForNode", { nodeId });
       console.info(`${kind}: ${fonts.map((x) => `${x.familyName} (${x.glyphCount} 字)`).join(", ")}`);
     }
     await page.evaluate(() => document.querySelector("#font-probe")?.remove());
+    // 1 文字の幅。罫線文字と日本語が英数の 2 倍なら、罫線が揃う
+    const widths = await output.evaluate((el) => {
+      const font = getComputedStyle(el).font;
+      const measure = (c) => {
+        const probe = document.createElement("span");
+        probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${font}`;
+        probe.textContent = c;
+        document.body.append(probe);
+        const w = probe.getBoundingClientRect().width;
+        probe.remove();
+        return w;
+      };
+      return { 英数: measure("a"), 日本語: measure("名"), 罫線文字: measure("─") };
+    });
+    console.info(`1 文字の幅(px): ${JSON.stringify(widths)}`);
   };
 
   await selectFormat("box");

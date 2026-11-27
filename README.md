@@ -156,7 +156,7 @@ banana;3;
 
 ![罫線文字の表（単線）の出力欄](docs/images/output-box.png)
 
-- 画像は、Chrome で拡張を実際に動かした画面です（既定の設定: 単線・行の間に罫線あり・曖昧幅 2）。
+- 画像は、Chrome で拡張を実際に動かした画面です。フォントは BIZ UDGothic で撮っています（既定の設定: 単線・行の間に罫線あり・曖昧幅 2）。
 - テキストの見え方は、表示するフォントで変わります。罫線文字が半角で表示される環境では、設定の「曖昧幅の文字」で幅 1 を選んでください。
 - 下のテキスト見本は、曖昧幅 1（`ambiguousWide: false`）で生成したものです。
 
@@ -347,6 +347,12 @@ node scripts/gen-eaw.mjs <EastAsianWidth.txt>  # 文字幅データ src/lib/eaw-
 ```
 
 `npm run screenshots` は Playwright の Chromium（初回は `npx playwright install chromium`）で拡張を読み込みます。拡張は headless では読み込めないため（headed で起動します）、画面のない環境では `xvfb-run -a npm run screenshots` で実行してください。
+
+画像は等幅の和文フォント BIZ UDGothic（SIL Open Font License。[google/fonts の `ofl/bizudgothic/`](https://github.com/google/fonts/tree/main/ofl/bizudgothic)）で撮っています。和文の等幅フォントが無い環境では罫線が揃わないため、フォントを入手し、そのディレクトリを `SCREENSHOT_FONT_DIR` に渡してください。撮影するブラウザにだけ読み込ませ、システムのフォント設定は変えません。フォントファイルはリポジトリに含めません。
+
+```sh
+SCREENSHOT_FONT_DIR=/path/to/bizudgothic xvfb-run -a npm run screenshots
+```
 
 - 仕様: [docs/spec.md](docs/spec.md)
 - 設計: [docs/design.md](docs/design.md)
